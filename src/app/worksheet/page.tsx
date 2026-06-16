@@ -6,12 +6,12 @@ import {
   Level,
   QuestionType,
   LEVEL_NAMES,
-  LEVEL_LABELS_EN,
   QUESTION_TYPE_NAMES,
   LEVEL_QUESTION_TYPES,
 } from '@/types';
 import LevelBadge from '@/components/LevelBadge';
 import WorksheetPreview from '@/components/WorksheetPreview';
+import { generatePrintHTML } from '@/lib/print-template';
 
 const ALL_LEVELS: Level[] = [1, 2, 3, 4, 5];
 
@@ -25,7 +25,6 @@ function WorksheetContent() {
   const [questionCount, setQuestionCount] = useState(20);
   const [selectedTypes, setSelectedTypes] = useState<QuestionType[]>([]);
   const [includeAnswers, setIncludeAnswers] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // 切换题型选择
@@ -45,48 +44,30 @@ function WorksheetContent() {
     }
   }, [level, selectedTypes]);
 
-  // 下载 PDF
-  const handleDownload = useCallback(async () => {
-    setIsGenerating(true);
+  // 打开打印窗口
+  const handlePrint = useCallback(() => {
     setError(null);
 
-    try {
-      const res = await fetch('/api/worksheet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          level,
-          questionCount,
-          questionTypes:
-            selectedTypes.length > 0
-              ? selectedTypes
-              : LEVEL_QUESTION_TYPES[level],
-          includeAnswerSheet: includeAnswers,
-          title: `Math Worksheet - ${LEVEL_LABELS_EN[level]}`,
-        }),
-      });
+    const types =
+      selectedTypes.length > 0 ? selectedTypes : LEVEL_QUESTION_TYPES[level];
 
-      if (!res.ok) {
-        const json = await res.json().catch(() => null);
-        setError(json?.error || 'PDF 生成失败');
-        return;
-      }
+    // 生成打印HTML
+    const html = generatePrintHTML({
+      level,
+      questionCount,
+      questionTypes: types,
+      includeAnswerSheet: includeAnswers,
+    });
 
-      // 下载文件
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `math-worksheet-level-${level}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch {
-      setError('网络错误，请重试');
-    } finally {
-      setIsGenerating(false);
+    // 在新窗口打开
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      setError('请允许弹出窗口后再试');
+      return;
     }
+
+    printWindow.document.write(html);
+    printWindow.document.close();
   }, [level, questionCount, selectedTypes, includeAnswers]);
 
   const availableTypes = LEVEL_QUESTION_TYPES[level];
@@ -100,7 +81,7 @@ function WorksheetContent() {
             📄 生成练习题
           </h1>
           <p className="text-gray-500">
-            选择难度和题型，下载可打印的 PDF 练习题
+            选择难度和题型，打印或保存为 PDF
           </p>
         </div>
 
@@ -211,21 +192,16 @@ function WorksheetContent() {
               </label>
             </div>
 
-            {/* 下载按钮 */}
+            {/* 打印按钮 */}
             <button
-              onClick={handleDownload}
-              disabled={isGenerating}
-              className="btn-primary w-full text-xl py-4 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handlePrint}
+              className="btn-primary w-full text-xl py-4"
             >
-              {isGenerating ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="animate-spin">⏳</span>
-                  正在生成 PDF...
-                </span>
-              ) : (
-                '⬇️ 下载练习题 PDF'
-              )}
+              🖨️ 打印练习题
             </button>
+            <p className="text-xs text-gray-400 text-center -mt-3">
+              💡 点击后自动打开打印窗口，在打印对话框中选择「另存为 PDF」即可保存
+            </p>
 
             {error && (
               <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl text-center">
