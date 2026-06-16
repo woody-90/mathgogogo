@@ -22,7 +22,7 @@ const SIZE_STYLES = {
   large: 'px-8 py-6 text-3xl',
 };
 
-const EMOJIS = ['🐶', '🐱', '🐰', '🐼'];
+const LABELS = ['A', 'B', 'C', 'D'];
 
 export default function AnswerButton({
   choice,
@@ -41,10 +41,19 @@ export default function AnswerButton({
         ${STATE_STYLES[state]}
         ${SIZE_STYLES[size]}
         ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
-        flex items-center justify-center gap-2 min-w-[120px]
+        flex items-center gap-3 min-w-[120px]
       `}
     >
-      <span className="text-2xl">{EMOJIS[index]}</span>
+      <span className={`
+        w-8 h-8 rounded-full flex items-center justify-center text-sm font-extrabold shrink-0
+        ${state === 'correct'
+          ? 'bg-green-500 text-white'
+          : state === 'wrong'
+          ? 'bg-red-500 text-white'
+          : 'bg-blue-500 text-white'}
+      `}>
+        {LABELS[index]}
+      </span>
       <span>{choice.label}</span>
     </button>
   );

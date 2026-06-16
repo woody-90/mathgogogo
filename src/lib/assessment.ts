@@ -8,8 +8,10 @@ import {
   AssessmentResult,
   AnswerRecord,
   Question,
+  QuestionType,
   LEVEL_NAMES,
   LEVEL_DESCRIPTIONS,
+  LEVEL_QUESTION_TYPES,
 } from '@/types';
 import { generateQuestion } from './question-bank';
 
@@ -41,11 +43,32 @@ export function getNextQuestion(state: AssessmentState): Question | null {
     return null;
   }
 
-  // 将 currentLevel (可能是小数) 四舍五入到最近的整数等级来出题
+  // 将 currentLevel 四舍五入到最近的整数等级
   const roundedLevel = Math.round(state.currentLevel) as Level;
-  const clampedLevel = Math.max(1, Math.min(5, roundedLevel)) as Level;
+  const baseLevel = Math.max(1, Math.min(5, roundedLevel)) as Level;
 
-  return generateQuestion(clampedLevel);
+  // 每 4 题插入一道"探索题"（来自更高等级），探测小朋友的上限
+  // 这样可以确保乘除法等高等级题型有机会被测试到
+  const isProbeQuestion = state.currentQuestionIndex > 0
+    && state.currentQuestionIndex % 4 === 3
+    && baseLevel < 5;
+
+  if (isProbeQuestion) {
+    const probeLevel = Math.min(5, baseLevel + 1) as Level;
+    // 优先选择当前等级没有的新题型
+    const currentTypes = LEVEL_QUESTION_TYPES[baseLevel];
+    const probeTypes = LEVEL_QUESTION_TYPES[probeLevel];
+    const newTypes = probeTypes.filter((t) => !currentTypes.includes(t));
+
+    if (newTypes.length > 0) {
+      // 有新的题型，从新题型中随机选
+      return generateQuestion(probeLevel, newTypes);
+    }
+    // 没有新题型，从探索等级随机出题
+    return generateQuestion(probeLevel);
+  }
+
+  return generateQuestion(baseLevel);
 }
 
 // ---- 提交答案并更新状态 ----
@@ -107,7 +130,7 @@ export function generateResult(state: AssessmentState): AssessmentResult {
   const totalCorrect = history.filter((r) => r.isCorrect).length;
   const score = Math.round((totalCorrect / history.length) * 100);
 
-  // 统计各等级表现
+  // 统计各等级表现 + 收集已测试的题型
   const levelScores: Record<Level, { correct: number; total: number }> = {
     1: { correct: 0, total: 0 },
     2: { correct: 0, total: 0 },
@@ -115,6 +138,7 @@ export function generateResult(state: AssessmentState): AssessmentResult {
     4: { correct: 0, total: 0 },
     5: { correct: 0, total: 0 },
   };
+  const testedTypes = new Set<QuestionType>();
 
   for (const record of history) {
     const lv = record.question.level;
@@ -122,14 +146,16 @@ export function generateResult(state: AssessmentState): AssessmentResult {
     if (record.isCorrect) {
       levelScores[lv].correct++;
     }
+    testedTypes.add(record.question.type);
   }
 
   // 确定最终等级
-  // 算法：找到答对率 >= 60% 的最高等级
+  // 算法：找到答对率 >= 60% 且至少有 2 题的最高等级
+  // （至少 2 题防止单道探索题误判等级）
   let finalLevel: Level = 1;
   for (let lv = 1; lv <= 5; lv++) {
     const ls = levelScores[lv as Level];
-    if (ls.total > 0) {
+    if (ls.total >= 2) {
       const rate = ls.correct / ls.total;
       if (rate >= 0.6) {
         finalLevel = lv as Level;
@@ -137,10 +163,20 @@ export function generateResult(state: AssessmentState): AssessmentResult {
     }
   }
 
-  // 如果 state.currentLevel 更高且接近整数，向上取整
+  // 从当前难度推测等级
   const roundedFinal = Math.round(state.currentLevel) as Level;
   if (roundedFinal > finalLevel && score >= 50) {
     finalLevel = Math.max(finalLevel, Math.min(roundedFinal, 5) as Level) as Level;
+  }
+
+  // 安全检查：不能推荐到未测试过核心题型的等级
+  // 等级 4 的核心题型是乘法，如果没测过乘法，不能超过等级 3
+  if (finalLevel >= 4 && !testedTypes.has('multiplication')) {
+    finalLevel = 3;
+  }
+  // 等级 5 的核心题型是除法，如果没测过除法，不能超过等级 4
+  if (finalLevel >= 5 && !testedTypes.has('division')) {
+    finalLevel = 4;
   }
 
   // 生成建议

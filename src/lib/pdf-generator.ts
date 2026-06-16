@@ -1,8 +1,8 @@
 // ============================================================
 // MathGoGoGo - PDF 练习题生成器
 // 使用 jsPDF 生成 A4 可打印练习题
-// 注：jsPDF 默认字体不支持中文，PDF 使用英文标签/数字，
-//     数学内容（数字、运算符）可用，网页界面本身是中文的
+// 注：jsPDF 默认字体不支持中文，PDF 使用英文/数字，
+//     中文 UI 在网页端，打印内容以数字和数学符号为主
 // ============================================================
 
 import jsPDF from 'jspdf';
@@ -27,11 +27,11 @@ const LEVEL_LABELS: Record<Level, string> = {
 };
 
 /**
- * 清理文本中的中文标点符号，替换为英文/通用符号
- * Math symbols (digits, +, -, x, /, =, <, >) are universal and preserved
+ * 清理文本，移除中文字符但保留结构和语义
  */
 function cleanMathText(text: string): string {
   return text
+    // Replace Chinese punctuation
     .replace(/？/g, '?')
     .replace(/！/g, '!')
     .replace(/，/g, ', ')
@@ -40,11 +40,34 @@ function cleanMathText(text: string): string {
     .replace(/）/g, ')')
     .replace(/×/g, 'x')
     .replace(/÷/g, '/')
-    // Replace CJK characters with empty string (keep digits, basic punctuation, math symbols)
+    .replace(/○/g, '__')
+    // Strip remaining CJK characters
     .replace(/[一-鿿　-〿＀-￯]/g, '')
-    // Clean up multiple spaces
+    // Clean up whitespace
     .replace(/\s{2,}/g, ' ')
+    .replace(/\s*\?\s*/g, '? ')
     .trim();
+}
+
+/**
+ * Build a display-friendly equation string from a math problem
+ */
+function formatProblem(text: string, answer: number, isAnswerKey: boolean): string {
+  const cleaned = cleanMathText(text);
+
+  if (isAnswerKey) {
+    // Answer key: show the answer
+    if (cleaned.includes('?')) {
+      return cleaned.replace(/\?/g, String(answer));
+    }
+    return `${cleaned} = ${answer}`;
+  }
+
+  // Worksheet: show blank for answer
+  if (cleaned.includes('?')) {
+    return cleaned.replace(/\?/g, '_____');
+  }
+  return `${cleaned} = _____`;
 }
 
 /** 生成练习题 PDF 并返回 Buffer */
@@ -55,138 +78,184 @@ export async function generateWorksheetPDF(config: WorksheetConfig): Promise<Buf
     format: 'a4',
   });
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
-  const contentWidth = pageWidth - margin * 2;
+  const pageWidth = doc.internal.pageSize.getWidth();   // 210mm
+  const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
 
-  // ---- Header Bar ----
-  doc.setFillColor(74, 144, 226);
-  doc.rect(0, 0, pageWidth, 18, 'F');
+  // 打印机安全边距 (留出足够空间避免内容被裁切)
+  const marginLeft = 20;
+  const marginRight = 20;
+  const marginTop = 20;
+  const marginBottom = 20;
+  const contentWidth = pageWidth - marginLeft - marginRight;
+  const contentHeight = pageHeight - marginTop - marginBottom;
 
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  const headerTitle = config.title || `Math Worksheet - ${LEVEL_LABELS[config.level]}`;
-  doc.text(headerTitle, pageWidth / 2, 12, { align: 'center' });
+  // ---- 辅助函数 ----
+  function drawLine(y: number, color: [number, number, number] = [220, 220, 220]) {
+    doc.setDrawColor(...color);
+    doc.setLineWidth(0.3);
+    doc.line(marginLeft, y, pageWidth - marginRight, y);
+  }
 
-  // ---- Info Fields ----
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  const infoY = 25;
-  doc.text('Name: ____________________', margin, infoY);
-  doc.text('Date: ____________________', margin + 80, infoY);
-  doc.text('Score: __________', margin + 140, infoY);
+  function drawHeader(pageNum: number, totalPages?: number) {
+    // 顶部细线
+    doc.setDrawColor(74, 144, 226);
+    doc.setLineWidth(1.2);
+    doc.line(marginLeft, marginTop, pageWidth - marginRight, marginTop);
 
-  // ---- Separator ----
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.5);
-  doc.line(margin, infoY + 5, pageWidth - margin, infoY + 5);
+    // 标题
+    doc.setFontSize(13);
+    doc.setTextColor(74, 144, 226);
+    doc.setFont('helvetica', 'bold');
+    const headerTitle = config.title || `Math Worksheet - ${LEVEL_LABELS[config.level]}`;
+    doc.text(headerTitle, pageWidth / 2, marginTop - 7, { align: 'center' });
 
-  // ---- Generate Problems ----
+    // 页码
+    if (totalPages) {
+      doc.setFontSize(7);
+      doc.setTextColor(160, 160, 160);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${pageNum} / ${totalPages}`, pageWidth - marginRight, marginTop - 7, { align: 'right' });
+    }
+  }
+
+  function drawFooter(text: string) {
+    const footerY = pageHeight - marginBottom + 12;
+    doc.setFontSize(7);
+    doc.setTextColor(180, 180, 180);
+    doc.setFont('helvetica', 'normal');
+    doc.text(text, pageWidth / 2, footerY, { align: 'center' });
+    // 底部分隔线
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.3);
+    doc.line(marginLeft, pageHeight - marginBottom + 6, pageWidth - marginRight, pageHeight - marginBottom + 6);
+  }
+
+  // ---- 生成题目 ----
   const problems = generateWorksheetProblems(
     config.level,
     config.questionCount,
     config.questionTypes
   );
 
-  // ---- Layout: 2 columns ----
+  // ---- 分页计算 ----
+  const totalPages = config.includeAnswerSheet ? 2 : 1;
+  // 练习题页最多放多少题 (2列布局)
+  const infoBlockHeight = 18;  // 姓名日期栏
+  const headerSpace = 10;       // 标题下方留白
+  const problemRowHeight = 12;  // 每行高度
+  const maxProblemsPerPage = Math.floor((contentHeight - infoBlockHeight - headerSpace) / problemRowHeight) * 2;
+
+  // ---- 第 1 页：练习题 ----
+  drawHeader(1, totalPages);
+
+  // 信息栏
+  const infoY = marginTop + 10;
+  doc.setFontSize(10);
+  doc.setTextColor(80, 80, 80);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Name: _________________________', marginLeft, infoY);
+  doc.text('Date: ____________', marginLeft + 100, infoY);
+  doc.text('Score: _______', marginLeft + 150, infoY);
+
+  drawLine(infoY + 5);
+
+  // 题目区域 - 2 列网格布局
+  const problemStartY = infoY + 12;
   const cols = 2;
-  const colWidth = contentWidth / cols - 8;
-  const startY = infoY + 14;
-  const rowHeight = 13;
-  const problemsPerColumn = Math.ceil(problems.length / cols);
+  const colGap = 10;
+  const colWidth = (contentWidth - colGap) / cols;
 
   problems.forEach((problem, index) => {
-    const col = index < problemsPerColumn ? 0 : 1;
-    const row = index < problemsPerColumn ? index : index - problemsPerColumn;
-    const x = margin + col * (colWidth + 14);
-    const y = startY + row * rowHeight;
+    const col = index % cols;
+    const row = Math.floor(index / cols);
+    const x = marginLeft + col * (colWidth + colGap);
+    const y = problemStartY + row * problemRowHeight;
 
-    // Page overflow check - add new page if needed
-    if (y > pageHeight - 25) {
+    // 检查是否需要新页
+    if (y > pageHeight - marginBottom) {
       doc.addPage();
-      // Continue on new page
-      const newY = 22 + (row - Math.floor((pageHeight - 25 - startY) / rowHeight)) * rowHeight;
-      doc.setFontSize(10);
+      // 新页不重复画 header 上的标题，但保留简单标识
+      const newY = marginTop + 5;
+      // 在新页继续 (简化处理：重新开始排版)
+      const remainingIndex = index;
+      const newCol = remainingIndex % cols;
+      const newRow = Math.floor((remainingIndex - (index - 1)) / cols);
+      const nx = marginLeft + newCol * (colWidth + colGap);
+      const ny = newY + newRow * problemRowHeight;
+
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.text(`${problem.index}.`, x, newY);
+      doc.setTextColor(60, 60, 60);
+      doc.text(`${problem.index}.`, nx, ny);
+
       doc.setFont('helvetica', 'normal');
-      const cleanText = cleanMathText(problem.questionText);
-      doc.text(`${cleanText} = ___________`, x + 8, newY);
+      const formatted = formatProblem(problem.questionText, problem.answer, false);
+      doc.text(formatted, nx + 8, ny);
       return;
     }
 
-    // Problem number + text
-    doc.setFontSize(10);
+    // 题目编号
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(60, 60, 60);
     doc.text(`${problem.index}.`, x, y);
 
+    // 题目内容
     doc.setFont('helvetica', 'normal');
-    const cleanText = cleanMathText(problem.questionText);
-    // Limit text length to fit in column
-    const maxChars = 40;
-    const displayText = cleanText.length > maxChars
-      ? cleanText.substring(0, maxChars - 3) + '...'
-      : cleanText;
-
-    // Add blank for answer
-    doc.text(`${displayText} = ___________`, x + 8, y);
+    doc.setTextColor(50, 50, 50);
+    const formatted = formatProblem(problem.questionText, problem.answer, false);
+    // 截断过长的文本
+    const maxChars = Math.floor(colWidth / 3.5);
+    const displayText = formatted.length > maxChars
+      ? formatted.substring(0, maxChars - 2) + '..'
+      : formatted;
+    doc.text(displayText, x + 8, y);
   });
 
-  // ---- Footer ----
-  const footerY = pageHeight - 12;
-  doc.setFontSize(8);
-  doc.setTextColor(160, 160, 160);
-  doc.setFont('helvetica', 'normal');
-  doc.text('MathGoGoGo - Practice Worksheet', pageWidth / 2, footerY, { align: 'center' });
+  drawFooter('MathGoGoGo - Practice Worksheet');
 
-  // ---- Optional Answer Sheet ----
+  // ---- 第 2 页：答案页（可选） ----
   if (config.includeAnswerSheet) {
     doc.addPage();
+    drawHeader(2, totalPages);
 
-    // Answer header
-    doc.setFillColor(231, 76, 60);
-    doc.rect(0, 0, pageWidth, 18, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
+    // 答案页标题
+    const answerTitleY = marginTop + 8;
+    doc.setFontSize(12);
+    doc.setTextColor(231, 76, 60);
     doc.setFont('helvetica', 'bold');
-    doc.text('Answer Key (For Parents)', pageWidth / 2, 12, { align: 'center' });
+    doc.text('Answer Key (For Parents Only)', pageWidth / 2, answerTitleY, { align: 'center' });
 
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
+    drawLine(answerTitleY + 5, [240, 200, 200]);
 
-    const answerStartY = 25;
+    // 答案内容 - 3 列布局
+    const answerStartY = answerTitleY + 12;
+    const answerCols = 3;
+    const answerColGap = 6;
+    const answerColWidth = (contentWidth - answerColGap * (answerCols - 1)) / answerCols;
     const answerRowHeight = 8;
 
-    // 3 columns for answers to fit more
-    const answerCols = 3;
-    const answerColWidth = contentWidth / answerCols - 5;
-    const answersPerColumn = Math.ceil(problems.length / answerCols);
-
     problems.forEach((problem, index) => {
-      const col = Math.floor(index / answersPerColumn);
-      const row = index % answersPerColumn;
-      const x = margin + col * (answerColWidth + 8);
+      const col = index % answerCols;
+      const row = Math.floor(index / answerCols);
+      const x = marginLeft + col * (answerColWidth + answerColGap);
       const y = answerStartY + row * answerRowHeight;
 
-      if (y > pageHeight - 20) return; // Skip if overflows
+      if (y > pageHeight - marginBottom) return;
 
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
+      doc.setTextColor(60, 60, 60);
       doc.text(`${problem.index}.`, x, y);
+
       doc.setFont('helvetica', 'normal');
+      doc.setTextColor(50, 50, 50);
       doc.text(`${problem.answer}`, x + 10, y);
     });
 
-    // Answer footer
-    doc.setFontSize(8);
-    doc.setTextColor(160, 160, 160);
-    doc.text('MathGoGoGo - Answer Key', pageWidth / 2, footerY, { align: 'center' });
+    drawFooter('MathGoGoGo - Answer Key');
   }
 
-  // Return PDF as Buffer
-  const buffer = Buffer.from(doc.output('arraybuffer'));
-  return buffer;
+  // 返回 PDF Buffer
+  return Buffer.from(doc.output('arraybuffer'));
 }
