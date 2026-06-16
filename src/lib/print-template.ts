@@ -173,18 +173,17 @@ export function generatePrintHTML(config: PrintConfig): string {
       color: #e74c3c;
     }
 
-    /* 打印样式 */
-    @media print {
-      body { padding: 15px 20px; }
-      .page-break { page-break-before: always; }
-      .no-print { display: none; }
-    }
-
+    /* 屏幕专用：按钮栏悬浮在顶部 */
     @media screen {
       .no-print {
-        display: block;
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        z-index: 100;
+        background: rgba(255,255,255,0.95);
+        backdrop-filter: blur(8px);
         text-align: center;
-        margin-bottom: 20px;
+        padding: 12px;
+        border-bottom: 1px solid #e0e0e0;
       }
       .no-print button {
         font-size: 16px;
@@ -199,6 +198,17 @@ export function generatePrintHTML(config: PrintConfig): string {
       .no-print button:hover { background: #357abd; }
       .no-print button.secondary { background: #95a5a6; }
       .no-print button.secondary:hover { background: #7f8c8d; }
+      .no-print p { margin: 6px 0 0; }
+      /* 给内容留出按钮栏的空间 */
+      .print-area { padding-top: 80px; }
+    }
+
+    /* 打印样式：完全隐藏按钮栏 */
+    @media print {
+      body { padding: 15px 20px; }
+      .page-break { page-break-before: always; }
+      .no-print { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; }
+      .print-area { padding-top: 0 !important; }
     }
   </style>
 </head>
@@ -211,22 +221,24 @@ export function generatePrintHTML(config: PrintConfig): string {
     </p>
   </div>
 
-  <div class="header">
-    <h1>🧮 数学练习题 · ${LEVEL_NAMES[config.level]}</h1>
-    <div class="info">
-      <span>姓名：______________</span>
-      <span>日期：${today}</span>
-      <span>用时：______________</span>
+  <div class="print-area">
+    <div class="header">
+      <h1>🧮 数学练习题 · ${LEVEL_NAMES[config.level]}</h1>
+      <div class="info">
+        <span>姓名：______________</span>
+        <span>日期：${today}</span>
+        <span>用时：______________</span>
+      </div>
     </div>
+
+    <div class="problems">
+      ${problemsHTML}
+    </div>
+
+    <p class="footer-note">MathGoGoGo · 快乐学数学 · ${LEVEL_NAMES[config.level]}</p>
+
+    ${answersHTML}
   </div>
-
-  <div class="problems">
-    ${problemsHTML}
-  </div>
-
-  <p class="footer-note">MathGoGoGo · 快乐学数学 · ${LEVEL_NAMES[config.level]}</p>
-
-  ${answersHTML}
 
   <script>
     // 自动弹出打印对话框
