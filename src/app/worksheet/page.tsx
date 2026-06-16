@@ -6,6 +6,7 @@ import {
   Level,
   QuestionType,
   LEVEL_NAMES,
+  LEVEL_LABELS_EN,
   QUESTION_TYPE_NAMES,
   LEVEL_QUESTION_TYPES,
 } from '@/types';
@@ -61,7 +62,7 @@ function WorksheetContent() {
               ? selectedTypes
               : LEVEL_QUESTION_TYPES[level],
           includeAnswerSheet: includeAnswers,
-          title: `Math Worksheet - ${LEVEL_NAMES[level]}`,
+          title: `Math Worksheet - ${LEVEL_LABELS_EN[level]}`,
         }),
       });
 

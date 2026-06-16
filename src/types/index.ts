@@ -5,13 +5,22 @@
 /** 数学水平等级 (1-5) */
 export type Level = 1 | 2 | 3 | 4 | 5;
 
-/** 等级名称映射 */
+/** 等级名称映射（中文，用于网页显示） */
 export const LEVEL_NAMES: Record<Level, string> = {
   1: '幼儿园小班',
   2: '幼儿园中/大班',
   3: '一年级',
   4: '二年级',
   5: '三年级',
+};
+
+/** 等级名称映射（英文，用于 PDF，因为 jsPDF 不支持中文字体） */
+export const LEVEL_LABELS_EN: Record<Level, string> = {
+  1: 'Pre-K',
+  2: 'Kindergarten',
+  3: 'Grade 1',
+  4: 'Grade 2',
+  5: 'Grade 3',
 };
 
 /** 等级描述 */

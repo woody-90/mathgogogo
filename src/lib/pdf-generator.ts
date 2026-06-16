@@ -6,7 +6,7 @@
 // ============================================================
 
 import jsPDF from 'jspdf';
-import { Level, QuestionType, LEVEL_NAMES } from '@/types';
+import { Level, QuestionType, LEVEL_LABELS_EN } from '@/types';
 import { generateWorksheetProblems } from './question-bank';
 
 interface WorksheetConfig {
@@ -17,14 +17,6 @@ interface WorksheetConfig {
   title?: string;
 }
 
-// 等级对应的英文标签
-const LEVEL_LABELS: Record<Level, string> = {
-  1: 'Pre-K',
-  2: 'Kindergarten',
-  3: 'Grade 1',
-  4: 'Grade 2',
-  5: 'Grade 3',
-};
 
 /**
  * 清理文本，移除中文字符但保留结构和语义
@@ -106,7 +98,7 @@ export async function generateWorksheetPDF(config: WorksheetConfig): Promise<Buf
     doc.setFontSize(13);
     doc.setTextColor(74, 144, 226);
     doc.setFont('helvetica', 'bold');
-    const headerTitle = config.title || `Math Worksheet - ${LEVEL_LABELS[config.level]}`;
+    const headerTitle = config.title || `Math Worksheet - ${LEVEL_LABELS_EN[config.level]}`;
     doc.text(headerTitle, pageWidth / 2, marginTop - 7, { align: 'center' });
 
     // 页码
