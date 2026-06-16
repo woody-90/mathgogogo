@@ -17,14 +17,13 @@ interface PrintConfig {
  * 根据题量计算合适的字号和间距
  */
 function getLayoutParams(questionCount: number) {
-  if (questionCount <= 10) {
+  // 统一大号单栏排版，适合小朋友阅读
+  if (questionCount <= 15) {
     return { fontSize: 22, lineHeight: 48, cols: 1 };
-  } else if (questionCount <= 20) {
-    return { fontSize: 18, lineHeight: 38, cols: 2 };
   } else if (questionCount <= 30) {
-    return { fontSize: 15, lineHeight: 32, cols: 2 };
+    return { fontSize: 18, lineHeight: 40, cols: 1 };
   } else {
-    return { fontSize: 13, lineHeight: 26, cols: 2 };
+    return { fontSize: 16, lineHeight: 36, cols: 1 };
   }
 }
 
