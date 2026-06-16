@@ -59,7 +59,7 @@ export const QUESTION_TYPE_NAMES: Record<QuestionType, string> = {
 export const LEVEL_QUESTION_TYPES: Record<Level, QuestionType[]> = {
   1: ['counting', 'comparison'],
   2: ['counting', 'comparison', 'addition', 'subtraction'],
-  3: ['comparison', 'addition', 'subtraction', 'fill_blank'],
+  3: ['comparison', 'addition', 'subtraction', 'fill_blank', 'word_problem'],
   4: ['addition', 'subtraction', 'multiplication', 'fill_blank', 'word_problem'],
   5: ['addition', 'subtraction', 'multiplication', 'division', 'fill_blank', 'word_problem'],
 };

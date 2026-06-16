@@ -234,12 +234,56 @@ function genFillBlank(level: Level): Question {
 }
 
 function genWordProblem(level: Level): Question {
-  // 应用题模板
-  const templates = [
-    // 加法场景
+  // 简单应用题模板（适用于等级 1-3，数字范围小）
+  const simpleTemplates = [
+    // 简单加法
     () => {
-      const a = randInt(3, 30);
-      const b = randInt(2, 20);
+      const a = randInt(2, 10);
+      const b = randInt(1, 10);
+      const items = ['苹果', '糖果', '铅笔', '气球', '贴纸', '饼干'];
+      const item = items[randInt(0, items.length - 1)];
+      return {
+        text: `小明有 ${a} 个${item}，妈妈又给了他 ${b} 个。小明现在一共有几个${item}？`,
+        answer: a + b,
+      };
+    },
+    // 简单减法
+    () => {
+      const a = randInt(8, 20);
+      const b = randInt(1, a - 1);
+      const items = ['苹果', '糖果', '饼干', '弹珠', '卡片'];
+      const item = items[randInt(0, items.length - 1)];
+      return {
+        text: `小华有 ${a} 个${item}，吃了 ${b} 个，还剩几个？`,
+        answer: a - b,
+      };
+    },
+    // 比较型
+    () => {
+      const a = randInt(5, 15);
+      const b = randInt(1, 10);
+      return {
+        text: `哥哥有 ${a} 颗糖，弟弟有 ${b} 颗糖。哥哥比弟弟多几颗？`,
+        answer: a - b,
+      };
+    },
+    // 一共型
+    () => {
+      const a = randInt(3, 12);
+      const b = randInt(2, 8);
+      return {
+        text: `树上有 ${a} 只小鸟，又飞来 ${b} 只。现在树上一共有几只小鸟？`,
+        answer: a + b,
+      };
+    },
+  ];
+
+  // 进阶应用题模板（等级 4-5，数字范围大，含乘除法）
+  const advancedTemplates = [
+    // 加法
+    () => {
+      const a = randInt(10, 50);
+      const b = randInt(5, 30);
       const items = ['苹果', '糖果', '铅笔', '书本', '气球', '贴纸'];
       const item = items[randInt(0, items.length - 1)];
       return {
@@ -247,10 +291,10 @@ function genWordProblem(level: Level): Question {
         answer: a + b,
       };
     },
-    // 减法场景
+    // 减法
     () => {
-      const a = randInt(10, 50);
-      const b = randInt(1, a - 1);
+      const a = randInt(20, 100);
+      const b = randInt(5, a - 1);
       const items = ['苹果', '糖果', '饼干', '弹珠', '卡片', '巧克力'];
       const item = items[randInt(0, items.length - 1)];
       return {
@@ -258,7 +302,7 @@ function genWordProblem(level: Level): Question {
         answer: a - b,
       };
     },
-    // 乘法场景
+    // 乘法
     () => {
       const a = randInt(2, 9);
       const b = randInt(2, 5);
@@ -267,7 +311,7 @@ function genWordProblem(level: Level): Question {
         answer: a * b,
       };
     },
-    // 除法场景
+    // 除法
     () => {
       const b = randInt(2, 6);
       const quotient = randInt(2, 8);
@@ -281,7 +325,7 @@ function genWordProblem(level: Level): Question {
     },
     // 混合运算
     () => {
-      const a = randInt(3, 15);
+      const a = randInt(5, 20);
       const b = randInt(1, a);
       const c = randInt(1, 10);
       return {
@@ -292,14 +336,16 @@ function genWordProblem(level: Level): Question {
   ];
 
   // 根据等级选择合适的模板
-  let availableTemplates = templates;
+  let templates;
   if (level <= 3) {
-    availableTemplates = templates.slice(0, 2); // 只用加减法
+    templates = simpleTemplates;   // 一年级及以下：简单加减法应用题
   } else if (level === 4) {
-    availableTemplates = templates.slice(0, 4); // 加减乘除
+    templates = advancedTemplates.slice(0, 4);  // 二年级：加减乘除
+  } else {
+    templates = advancedTemplates; // 三年级：全部题型
   }
 
-  const template = availableTemplates[randInt(0, availableTemplates.length - 1)];
+  const template = templates[randInt(0, templates.length - 1)];
   const { text, answer } = template();
 
   return {
@@ -309,7 +355,7 @@ function genWordProblem(level: Level): Question {
     questionText: text,
     choices: generateChoices(answer, makeDistractors(answer)),
     correctAnswer: answer,
-    explanation: text.replace('？', `？答案是 ${answer}`),
+    explanation: `${text.replace('？', `？答案是 ${answer}。`)}`,
   };
 }
 
