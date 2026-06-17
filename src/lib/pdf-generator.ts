@@ -133,43 +133,5 @@ export async function generateWorksheetPDF(config: WorksheetConfig): Promise<Buf
   doc.text('MathGoGoGo · 快乐学数学', pageWidth / 2, footerY, { align: 'center' });
   thinLine(pageHeight - mb + 3);
 
-  // ---- 答案页 ----
-  if (config.includeAnswerSheet) {
-    doc.addPage();
-    registerFont(doc);
-
-    const atY = mt + 6;
-    doc.setFontSize(16);
-    doc.setTextColor(231, 76, 60);
-    doc.setFont(FONT_NAME, 'normal');
-    doc.text('📋 答案（家长版）', pageWidth / 2, atY, { align: 'center' });
-    thinLine(atY + 6);
-
-    const aStartY = atY + 13;
-    const aCols = 3;
-    const aColW = cw / aCols;
-    const aPerCol = Math.ceil(problems.length / aCols);
-
-    doc.setFontSize(10);
-    doc.setTextColor(50, 50, 50);
-
-    problems.forEach((problem, i) => {
-      const col = Math.floor(i / aPerCol);
-      const row = i % aPerCol;
-      const x = ml + col * aColW;
-      const y = aStartY + row * 7;
-
-      if (y > pageHeight - mb - 5) return;
-
-      doc.setFont(FONT_NAME, 'normal');
-      doc.text(`${problem.index}. ${problem.answer}`, x, y);
-    });
-
-    doc.setFontSize(8);
-    doc.setTextColor(170, 170, 170);
-    doc.text('MathGoGoGo · 答案仅供参考', pageWidth / 2, footerY, { align: 'center' });
-    thinLine(pageHeight - mb + 3);
-  }
-
   return Buffer.from(doc.output('arraybuffer'));
 }

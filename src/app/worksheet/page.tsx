@@ -23,7 +23,6 @@ function WorksheetContent() {
   );
   const [questionCount, setQuestionCount] = useState(20);
   const [selectedTypes, setSelectedTypes] = useState<QuestionType[]>([]);
-  const [includeAnswers, setIncludeAnswers] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,7 +56,7 @@ function WorksheetContent() {
           level,
           questionCount,
           questionTypes: types,
-          includeAnswerSheet: includeAnswers,
+          includeAnswerSheet: false,
         }),
       });
 
@@ -81,7 +80,7 @@ function WorksheetContent() {
     } finally {
       setIsDownloading(false);
     }
-  }, [level, questionCount, selectedTypes, includeAnswers]);
+  }, [level, questionCount, selectedTypes]);
 
   const availableTypes = LEVEL_QUESTION_TYPES[level];
 
@@ -187,21 +186,6 @@ function WorksheetContent() {
                   ? '未选择时默认包含全部题型'
                   : `已选择 ${selectedTypes.length} 种题型`}
               </p>
-            </div>
-
-            {/* 答案页 */}
-            <div className="card p-5">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={includeAnswers}
-                  onChange={(e) => setIncludeAnswers(e.target.checked)}
-                  className="w-5 h-5 rounded accent-blue-500"
-                />
-                <span className="font-bold text-gray-700">
-                  📋 附带答案页（家长版）
-                </span>
-              </label>
             </div>
 
             {/* 下载按钮 */}
