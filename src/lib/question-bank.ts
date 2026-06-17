@@ -1,18 +1,16 @@
 // ============================================================
-// MathGoGoGo - 题库引擎
-// 为每个等级/题型组合生成参数化题目
+// MathGoGoGo - 题库引擎 (6级体系)
+// 匹配 3-8 岁儿童发展标准
 // ============================================================
 
 import { Level, QuestionType, Question, Choice, LEVEL_QUESTION_TYPES } from '@/types';
 
 // ---- 工具函数 ----
 
-/** 生成 [min, max] 范围内的随机整数 */
 function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-/** 随机打乱数组 */
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -22,36 +20,27 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-/** 生成唯一 ID */
 function uid(): string {
   return Math.random().toString(36).substring(2, 9);
 }
 
-/** 生成 4 个选项（包含正确答案 + 3 个干扰项） */
 function generateChoices(correct: number, distractors: number[]): Choice[] {
   const all = [correct, ...distractors];
-  // 去重
   const unique = [...new Set(all)];
-  // 如果不够 4 个，补充
   while (unique.length < 4) {
     const extra = correct + randInt(-3, 3);
-    if (extra >= 0 && !unique.includes(extra)) {
-      unique.push(extra);
-    }
+    if (extra >= 0 && !unique.includes(extra)) unique.push(extra);
   }
   return shuffle(unique.slice(0, 4).map((v) => ({ value: v, label: String(v) })));
 }
 
-/** 生成与正确答案相近的干扰项 */
 function makeDistractors(correct: number, count: number = 3): number[] {
   const distractors: number[] = [];
   const offsets = shuffle([-3, -2, -1, 1, 2, 3, -4, 4]);
-  for (const offset of offsets) {
+  for (const o of offsets) {
     if (distractors.length >= count) break;
-    const d = correct + offset;
-    if (d >= 0 && d !== correct && !distractors.includes(d)) {
-      distractors.push(d);
-    }
+    const d = correct + o;
+    if (d >= 0 && d !== correct && !distractors.includes(d)) distractors.push(d);
   }
   return distractors;
 }
@@ -59,64 +48,57 @@ function makeDistractors(correct: number, count: number = 3): number[] {
 // ---- 等级参数 ----
 
 interface LevelParams {
-  numberRange: [number, number];  // 数字范围
-  addRange: [number, number];     // 加法结果范围
-  subRange: [number, number];     // 减法被减数范围
-  mulRange: [number, number];     // 乘法表范围
-  divRange: [number, number];     // 除法被除数范围
+  numberRange: [number, number];
+  addMax: number;
+  subMax: number;
+  mulMax: number;
 }
 
-const LEVEL_PARAMS: Record<Level, LevelParams> = {
-  1: { numberRange: [1, 10], addRange: [1, 5], subRange: [1, 5], mulRange: [1, 1], divRange: [1, 1] },
-  2: { numberRange: [1, 20], addRange: [1, 10], subRange: [1, 10], mulRange: [1, 1], divRange: [1, 1] },
-  3: { numberRange: [1, 50], addRange: [1, 20], subRange: [1, 20], mulRange: [1, 2], divRange: [1, 1] },
-  4: { numberRange: [1, 100], addRange: [1, 100], subRange: [1, 100], mulRange: [1, 5], divRange: [2, 5] },
-  5: { numberRange: [1, 1000], addRange: [10, 999], subRange: [10, 999], mulRange: [1, 9], divRange: [2, 9] },
+const LP: Record<Level, LevelParams> = {
+  1: { numberRange: [1, 5], addMax: 5, subMax: 5, mulMax: 1 },
+  2: { numberRange: [1, 10], addMax: 10, subMax: 10, mulMax: 1 },
+  3: { numberRange: [1, 20], addMax: 20, subMax: 20, mulMax: 2 },
+  4: { numberRange: [1, 100], addMax: 100, subMax: 100, mulMax: 5 },
+  5: { numberRange: [1, 1000], addMax: 999, subMax: 999, mulMax: 9 },
+  6: { numberRange: [1, 10000], addMax: 9999, subMax: 9999, mulMax: 9 },
 };
 
 // ---- 各题型生成器 ----
 
 function genCounting(level: Level): Question {
-  const p = LEVEL_PARAMS[level];
-  const count = randInt(p.numberRange[0], Math.min(p.numberRange[1], 20));
-  // 用表情符号表示可数的物体
-  const emojis = ['🌟', '🍎', '🌸', '🐱', '🎈', '⭐', '🐶', '🍪', '🦋', '🐟'];
+  const p = LP[level];
+  const maxCount = level <= 2 ? p.numberRange[1] : Math.min(p.numberRange[1], 20);
+  const count = randInt(p.numberRange[0], maxCount);
+  const emojis = ['🌟', '🍎', '🌸', '🐱', '🎈', '⭐', '🐶', '🍪'];
   const emoji = emojis[randInt(0, emojis.length - 1)];
   const objects = Array(count).fill(emoji).join(' ');
 
-  const correct = count;
-  const distractors = makeDistractors(correct);
-
   return {
-    id: uid(),
-    type: 'counting',
-    level,
+    id: uid(), type: 'counting', level,
     questionText: `数一数，下面一共有几个 ${emoji}？\n\n${objects}`,
-    choices: generateChoices(correct, distractors),
-    correctAnswer: correct,
+    choices: generateChoices(count, makeDistractors(count)),
+    correctAnswer: count,
   };
 }
 
 function genComparison(level: Level): Question {
-  const p = LEVEL_PARAMS[level];
+  const p = LP[level];
   const a = randInt(p.numberRange[0], p.numberRange[1]);
   let b: number;
-  // 确保 a 和 b 不同，且差值适中
-  const diff = randInt(1, Math.max(1, Math.floor((p.numberRange[1] - p.numberRange[0]) / 4)));
+  const diff = randInt(1, Math.max(1, Math.floor(p.numberRange[1] / 4)));
   if (Math.random() > 0.5) {
-    b = a - diff;
-    if (b < 0) b = a + diff;
+    b = Math.max(0, a - diff);
   } else {
     b = a + diff;
   }
+  // 30% 概率出相等题
+  if (level >= 2 && Math.random() < 0.3) b = a;
 
   const symbol = a > b ? '>' : a < b ? '<' : '=';
   const correct = symbol === '>' ? 0 : symbol === '<' ? 1 : 2;
 
   return {
-    id: uid(),
-    type: 'comparison',
-    level,
+    id: uid(), type: 'comparison', level,
     questionText: `比较大小：${a} ○ ${b}，○ 里应该填什么？`,
     choices: [
       { value: 0, label: '>' },
@@ -129,16 +111,14 @@ function genComparison(level: Level): Question {
 }
 
 function genAddition(level: Level): Question {
-  const p = LEVEL_PARAMS[level];
-  const maxResult = p.addRange[1];
-  const a = randInt(p.addRange[0], maxResult - 1);
-  const b = randInt(1, maxResult - a);
+  const p = LP[level];
+  const max = p.addMax;
+  const a = randInt(1, max - 1);
+  const b = randInt(1, max - a);
   const correct = a + b;
 
   return {
-    id: uid(),
-    type: 'addition',
-    level,
+    id: uid(), type: 'addition', level,
     questionText: `${a} + ${b} = ？`,
     choices: generateChoices(correct, makeDistractors(correct)),
     correctAnswer: correct,
@@ -147,15 +127,14 @@ function genAddition(level: Level): Question {
 }
 
 function genSubtraction(level: Level): Question {
-  const p = LEVEL_PARAMS[level];
-  const a = randInt(Math.max(p.subRange[0], 2), p.subRange[1]);
+  const p = LP[level];
+  const max = p.subMax;
+  const a = randInt(Math.max(2, Math.floor(max / 4)), max);
   const b = randInt(1, a);
   const correct = a - b;
 
   return {
-    id: uid(),
-    type: 'subtraction',
-    level,
+    id: uid(), type: 'subtraction', level,
     questionText: `${a} - ${b} = ？`,
     choices: generateChoices(correct, makeDistractors(correct)),
     correctAnswer: correct,
@@ -164,204 +143,253 @@ function genSubtraction(level: Level): Question {
 }
 
 function genMultiplication(level: Level): Question {
-  const p = LEVEL_PARAMS[level];
-  const a = randInt(p.mulRange[0], p.mulRange[1]);
-  const b = randInt(1, p.mulRange[1]);
+  const p = LP[level];
+  const a = randInt(2, p.mulMax);
+  const b = randInt(2, level <= 5 ? 5 : 9);
   const correct = a * b;
 
   return {
-    id: uid(),
-    type: 'multiplication',
-    level,
+    id: uid(), type: 'multiplication', level,
     questionText: `${a} × ${b} = ？`,
     choices: generateChoices(correct, makeDistractors(correct)),
     correctAnswer: correct,
-    explanation: `${a} × ${b} = ${correct}`,
   };
 }
 
 function genDivision(level: Level): Question {
-  const p = LEVEL_PARAMS[level];
-  const b = randInt(p.divRange[0], Math.min(p.divRange[1], 9));
-  const quotient = randInt(1, 9);
+  const b = randInt(2, level <= 5 ? 5 : 9);
+  const quotient = randInt(2, level <= 5 ? 5 : 9);
   const a = b * quotient;
-  const correct = quotient;
 
   return {
-    id: uid(),
-    type: 'division',
-    level,
+    id: uid(), type: 'division', level,
     questionText: `${a} ÷ ${b} = ？`,
-    choices: generateChoices(correct, makeDistractors(correct)),
-    correctAnswer: correct,
-    explanation: `${a} ÷ ${b} = ${correct}`,
+    choices: generateChoices(quotient, makeDistractors(quotient)),
+    correctAnswer: quotient,
   };
 }
 
 function genFillBlank(level: Level): Question {
-  const p = LEVEL_PARAMS[level];
+  const p = LP[level];
 
-  // 随机选择加法或减法填空题
   if (Math.random() > 0.5) {
-    // 加法填空：? + b = c 或 a + ? = c
-    const b = randInt(1, p.addRange[1] - 1);
-    const correct = randInt(1, p.addRange[1] - b);
+    const b = randInt(1, Math.min(20, p.addMax - 1));
+    const correct = randInt(1, Math.min(20, p.addMax - b));
     const c = correct + b;
     return {
-      id: uid(),
-      type: 'fill_blank',
-      level,
+      id: uid(), type: 'fill_blank', level,
       questionText: `? + ${b} = ${c}，问号处应该填几？`,
       choices: generateChoices(correct, makeDistractors(correct)),
       correctAnswer: correct,
-      explanation: `${correct} + ${b} = ${c}`,
     };
   } else {
-    // 减法填空：? - b = c 或 a - ? = c
-    const b = randInt(1, Math.floor(p.subRange[1] / 2));
-    const correct = randInt(b + 1, p.subRange[1]);
+    const b = randInt(1, Math.min(10, Math.floor(p.subMax / 2)));
+    const correct = randInt(b + 1, Math.min(30, p.subMax));
     const c = correct - b;
     return {
-      id: uid(),
-      type: 'fill_blank',
-      level,
+      id: uid(), type: 'fill_blank', level,
       questionText: `? - ${b} = ${c}，问号处应该填几？`,
       choices: generateChoices(correct, makeDistractors(correct)),
       correctAnswer: correct,
-      explanation: `${correct} - ${b} = ${c}`,
     };
   }
 }
 
 function genWordProblem(level: Level): Question {
-  // 简单应用题模板（适用于等级 1-3，数字范围小）
-  const simpleTemplates = [
-    // 简单加法
+  // ---- 简单应用题（等级 1-3）----
+  const easyTemplates = [
     () => {
-      const a = randInt(2, 10);
-      const b = randInt(1, 10);
-      const items = ['苹果', '糖果', '铅笔', '气球', '贴纸', '饼干'];
+      const a = randInt(2, level <= 2 ? 5 : 10);
+      const b = randInt(1, level <= 2 ? 3 : 8);
+      const items = ['苹果', '糖果', '铅笔', '气球', '饼干'];
       const item = items[randInt(0, items.length - 1)];
       return {
-        text: `小明有 ${a} 个${item}，妈妈又给了他 ${b} 个。小明现在一共有几个${item}？`,
+        text: `小明有 ${a} 个${item}，妈妈又给了他 ${b} 个，现在一共有几个？`,
         answer: a + b,
       };
     },
-    // 简单减法
     () => {
-      const a = randInt(8, 20);
+      const a = randInt(level <= 2 ? 3 : 5, level <= 2 ? 10 : 20);
       const b = randInt(1, a - 1);
-      const items = ['苹果', '糖果', '饼干', '弹珠', '卡片'];
+      const items = ['苹果', '糖果', '饼干', '弹珠'];
       const item = items[randInt(0, items.length - 1)];
       return {
         text: `小华有 ${a} 个${item}，吃了 ${b} 个，还剩几个？`,
         answer: a - b,
       };
     },
-    // 比较型
     () => {
-      const a = randInt(5, 15);
-      const b = randInt(1, 10);
+      const a = randInt(3, level <= 2 ? 8 : 15);
+      const b = randInt(1, Math.min(8, a));
       return {
-        text: `哥哥有 ${a} 颗糖，弟弟有 ${b} 颗糖。哥哥比弟弟多几颗？`,
+        text: `哥哥有 ${a} 颗糖，弟弟有 ${b} 颗糖，哥哥比弟弟多几颗？`,
         answer: a - b,
       };
     },
-    // 一共型
     () => {
-      const a = randInt(3, 12);
-      const b = randInt(2, 8);
+      const a = randInt(2, level <= 2 ? 5 : 8);
+      const b = randInt(2, level <= 2 ? 3 : 6);
       return {
-        text: `树上有 ${a} 只小鸟，又飞来 ${b} 只。现在树上一共有几只小鸟？`,
+        text: `树上有 ${a} 只小鸟，又飞来 ${b} 只，现在一共有几只？`,
         answer: a + b,
       };
     },
   ];
 
-  // 进阶应用题模板（等级 4-5，数字范围大，含乘除法）
-  const advancedTemplates = [
-    // 加法
+  // ---- 进阶应用题（等级 4-6）----
+  const hardTemplates = [
     () => {
       const a = randInt(10, 50);
       const b = randInt(5, 30);
-      const items = ['苹果', '糖果', '铅笔', '书本', '气球', '贴纸'];
+      const items = ['苹果', '糖果', '铅笔', '书本'];
       const item = items[randInt(0, items.length - 1)];
       return {
-        text: `小明有 ${a} 个${item}，妈妈又给了他 ${b} 个。小明现在一共有几个${item}？`,
+        text: `小明有 ${a} 个${item}，妈妈又给了他 ${b} 个，现在一共有几个？`,
         answer: a + b,
       };
     },
-    // 减法
     () => {
       const a = randInt(20, 100);
       const b = randInt(5, a - 1);
-      const items = ['苹果', '糖果', '饼干', '弹珠', '卡片', '巧克力'];
+      const items = ['苹果', '糖果', '饼干', '弹珠'];
       const item = items[randInt(0, items.length - 1)];
       return {
         text: `小华有 ${a} 个${item}，吃了 ${b} 个，还剩几个？`,
         answer: a - b,
       };
     },
-    // 乘法
     () => {
       const a = randInt(2, 9);
       const b = randInt(2, 5);
       return {
-        text: `教室里有 ${a} 排桌子，每排有 ${b} 张桌子。教室里一共有多少张桌子？`,
+        text: `教室里有 ${a} 排桌子，每排 ${b} 张，一共有多少张？`,
         answer: a * b,
       };
     },
-    // 除法
     () => {
       const b = randInt(2, 6);
-      const quotient = randInt(2, 8);
-      const a = b * quotient;
-      const items = ['糖果', '铅笔', '饼干', '贴纸', '卡片'];
+      const q = randInt(2, 8);
+      const items = ['糖果', '铅笔', '饼干', '贴纸'];
       const item = items[randInt(0, items.length - 1)];
       return {
-        text: `老师把 ${a} 个${item}平均分给 ${b} 个小朋友，每个小朋友分到几个？`,
-        answer: quotient,
+        text: `老师把 ${b * q} 个${item}平均分给 ${b} 个小朋友，每人几个？`,
+        answer: q,
       };
     },
-    // 混合运算
     () => {
-      const a = randInt(5, 20);
-      const b = randInt(1, a);
-      const c = randInt(1, 10);
+      const a = randInt(10, 50);
+      const b = randInt(1, Math.min(20, a));
+      const c = randInt(5, 20);
       return {
-        text: `小红有 ${a} 块钱，买文具花了 ${b} 块钱，奶奶又给了她 ${c} 块钱。小红现在有多少钱？`,
+        text: `小红有 ${a} 元，买文具花了 ${b} 元，奶奶又给了 ${c} 元，现在有多少元？`,
         answer: a - b + c,
       };
     },
   ];
 
-  // 根据等级选择合适的模板
-  let templates;
-  if (level <= 3) {
-    templates = simpleTemplates;   // 一年级及以下：简单加减法应用题
-  } else if (level === 4) {
-    templates = advancedTemplates.slice(0, 4);  // 二年级：加减乘除
-  } else {
-    templates = advancedTemplates; // 三年级：全部题型
-  }
-
-  const template = templates[randInt(0, templates.length - 1)];
-  const { text, answer } = template();
+  const templates = level <= 3 ? easyTemplates : hardTemplates;
+  const t = templates[randInt(0, templates.length - 1)];
+  const { text, answer } = t();
 
   return {
-    id: uid(),
-    type: 'word_problem',
-    level,
+    id: uid(), type: 'word_problem', level,
     questionText: text,
     choices: generateChoices(answer, makeDistractors(answer)),
     correctAnswer: answer,
-    explanation: `${text.replace('？', `？答案是 ${answer}。`)}`,
+    explanation: text.replace('？', `？答案是 ${answer}`),
+  };
+}
+
+/** 图形识别题 */
+function genShapes(level: Level): Question {
+  const shapes = level <= 2
+    ? ['圆形 ○', '正方形 □', '三角形 △']
+    : ['圆形 ○', '正方形 □', '三角形 △', '长方形 ▭', '椭圆形 ⬭'];
+
+  const names = level <= 2
+    ? ['圆形', '正方形', '三角形']
+    : ['圆形', '正方形', '三角形', '长方形', '椭圆形'];
+
+  const correctIdx = randInt(0, names.length - 1);
+
+  // 生成选项：用不同的 shape 名称
+  const allShapes = ['圆形', '正方形', '三角形', '长方形', '椭圆形'];
+  const distractors = allShapes.filter((_, i) => i !== correctIdx || i >= names.length);
+  const choices: Choice[] = [
+    { value: correctIdx, label: shapes[correctIdx] },
+    ...shuffle(
+      distractors.slice(0, 3).map((name, i) => {
+        const shapeText = shapes[allShapes.indexOf(name)] || name;
+        return { value: 99, label: shapeText };
+      })
+    ),
+  ];
+  // 修正：所有选项的 value 重新编排
+  const finalChoices = shuffle(
+    choices.map((c, i) => ({ ...c, value: i }))
+  );
+  const correctValue = finalChoices.findIndex((c) => c.label === shapes[correctIdx]);
+
+  return {
+    id: uid(), type: 'shapes', level,
+    questionText: `下面哪个是 ${names[correctIdx]}？`,
+    choices: finalChoices,
+    correctAnswer: correctValue,
+    explanation: `${shapes[correctIdx]} 就是 ${names[correctIdx]}`,
+  };
+}
+
+/** 规律推理题 */
+function genPatterns(level: Level): Question {
+  // 生成规律序列
+  const emojis = ['🔴', '🔵', '🟡', '🟢', '⭐', '❤️'];
+  const patternType = level <= 1
+    ? 'AB'  // 小班只做 AB
+    : level === 2
+    ? ['AB', 'AAB'][randInt(0, 1)]  // 中班 AB / AAB
+    : ['AB', 'AAB', 'ABC'][randInt(0, 2)];  // 大班及以上 ABC
+
+  let sequence: string[];
+  let nextItem: string;
+
+  if (patternType === 'AB') {
+    const a = emojis[randInt(0, 3)];
+    const b = emojis[randInt(0, 3)];
+    sequence = [a, b, a, b, a];
+    nextItem = b;
+  } else if (patternType === 'AAB') {
+    const a = emojis[randInt(0, 3)];
+    const b = emojis[randInt(0, 3)];
+    sequence = [a, a, b, a, a];
+    nextItem = b;
+  } else {
+    const a = emojis[randInt(0, 3)];
+    const b = emojis[randInt(0, 3)];
+    const c = emojis[randInt(0, 3)];
+    sequence = [a, b, c, a, b];
+    nextItem = c;
+  }
+
+  const seqStr = sequence.join(' ');
+  const choices = shuffle([
+    { value: 0, label: nextItem },
+    { value: 1, label: sequence[0] },
+    { value: 2, label: sequence[1] },
+    { value: 3, label: sequence.length > 2 ? sequence[2] : sequence[0] },
+  ]);
+  const correctValue = choices.findIndex((c) => c.label === nextItem);
+
+  return {
+    id: uid(), type: 'patterns', level,
+    questionText: `找规律：${seqStr} ？\n接下来应该是哪个？`,
+    choices,
+    correctAnswer: correctValue,
+    explanation: `规律是 ${patternType}，接下来应选 ${nextItem}`,
   };
 }
 
 // ---- 主生成函数 ----
 
-/** 生成一道随机题目（根据等级和可选题型） */
 export function generateQuestion(level: Level, allowedTypes?: QuestionType[]): Question {
   const availableTypes = allowedTypes || LEVEL_QUESTION_TYPES[level];
   const type = availableTypes[randInt(0, availableTypes.length - 1)];
@@ -375,11 +403,12 @@ export function generateQuestion(level: Level, allowedTypes?: QuestionType[]): Q
     case 'division': return genDivision(level);
     case 'fill_blank': return genFillBlank(level);
     case 'word_problem': return genWordProblem(level);
+    case 'shapes': return genShapes(level);
+    case 'patterns': return genPatterns(level);
     default: return genAddition(level);
   }
 }
 
-/** 生成一批练习题 */
 export function generateWorksheetProblems(
   level: Level,
   count: number,
@@ -391,13 +420,7 @@ export function generateWorksheetProblems(
   for (let i = 0; i < count; i++) {
     const type = availableTypes[randInt(0, availableTypes.length - 1)];
     const q = generateQuestion(level, [type]);
-    problems.push({
-      index: i + 1,
-      type: q.type,
-      questionText: q.questionText,
-      answer: q.correctAnswer,
-    });
+    problems.push({ index: i + 1, type: q.type, questionText: q.questionText, answer: q.correctAnswer });
   }
-
   return problems;
 }

@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const { level, questionCount, questionTypes, includeAnswerSheet, title } = body;
 
     // 参数校验
-    if (!level || level < 1 || level > 5) {
+    if (!level || level < 1 || level > 6) {
       return NextResponse.json({
         success: false,
         error: '等级参数无效 (1-5)',

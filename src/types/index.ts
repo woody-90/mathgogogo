@@ -1,67 +1,76 @@
 // ============================================================
 // MathGoGoGo - 类型定义
+// 6 级体系：匹配 3-8 岁儿童发展标准
 // ============================================================
 
-/** 数学水平等级 (1-5) */
-export type Level = 1 | 2 | 3 | 4 | 5;
+/** 数学水平等级 (1-6)，对应 3-8 岁 */
+export type Level = 1 | 2 | 3 | 4 | 5 | 6;
 
-/** 等级名称映射（中文，用于网页显示） */
+/** 等级名称（中文） */
 export const LEVEL_NAMES: Record<Level, string> = {
-  1: '幼儿园小班',
-  2: '幼儿园中/大班',
-  3: '一年级',
-  4: '二年级',
-  5: '三年级',
-};
-
-/** 等级名称映射（英文，用于 PDF，因为 jsPDF 不支持中文字体） */
-export const LEVEL_LABELS_EN: Record<Level, string> = {
-  1: 'Pre-K',
-  2: 'Kindergarten',
-  3: 'Grade 1',
-  4: 'Grade 2',
-  5: 'Grade 3',
+  1: '小班（3岁）',
+  2: '中班（4岁）',
+  3: '大班（5岁）',
+  4: '一年级（6-7岁）',
+  5: '二年级（7-8岁）',
+  6: '三年级（8岁）',
 };
 
 /** 等级描述 */
 export const LEVEL_DESCRIPTIONS: Record<Level, string> = {
-  1: '认识数字 1-10，会比较大小和多少，认识基本图形',
-  2: '掌握 1-20 数字，简单规律排序，10 以内加减法',
-  3: '20 以内加减法，认识个位十位，比较数字大小，简单应用题',
-  4: '100 以内加减法，乘法口诀（1-5），简单应用题',
-  5: '乘除法运算，多位数加减，分数初步认识',
+  1: '点数1-5、认识圆形/正方形/三角形、比大小长短、简单AB规律',
+  2: '点数1-10、数字0-10对应、10以内实物加减、认识长方形/椭圆',
+  3: '1-100顺数倒数、20以内进退位加减、认识钟表钱币、简单应用题',
+  4: '100以内加减法、连加连减混合运算、人民币购物找零、时分秒',
+  5: '万以内数读写、乘法口诀表内乘除法、两步应用题、长度重量',
+  6: '大数运算、分数小数初步、四则混合运算、周长面积、多步骤应用',
+};
+
+/** 等级名称（英文，PDF用） */
+export const LEVEL_LABELS_EN: Record<Level, string> = {
+  1: 'Pre-K (Age 3)',
+  2: 'K-4 (Age 4)',
+  3: 'K-5 (Age 5)',
+  4: 'Grade 1 (Age 6-7)',
+  5: 'Grade 2 (Age 7-8)',
+  6: 'Grade 3 (Age 8)',
 };
 
 /** 题型 */
 export type QuestionType =
-  | 'counting'      // 数数题
-  | 'comparison'    // 比较题
-  | 'addition'      // 加法题
-  | 'subtraction'   // 减法题
-  | 'multiplication' // 乘法题
-  | 'division'      // 除法题
-  | 'fill_blank'    // 填空题
-  | 'word_problem'; // 应用题
+  | 'counting'       // 数数
+  | 'comparison'     // 比较大小/长短/高矮
+  | 'addition'       // 加法
+  | 'subtraction'    // 减法
+  | 'multiplication' // 乘法
+  | 'division'       // 除法
+  | 'fill_blank'     // 填空
+  | 'word_problem'   // 应用题
+  | 'shapes'         // 图形识别
+  | 'patterns';      // 规律推理
 
 /** 题型名称（中文） */
 export const QUESTION_TYPE_NAMES: Record<QuestionType, string> = {
   counting: '数数',
-  comparison: '比大小',
+  comparison: '比较',
   addition: '加法',
   subtraction: '减法',
   multiplication: '乘法',
   division: '除法',
   fill_blank: '填空',
   word_problem: '应用题',
+  shapes: '图形',
+  patterns: '规律',
 };
 
 /** 每个等级适用的题型 */
 export const LEVEL_QUESTION_TYPES: Record<Level, QuestionType[]> = {
-  1: ['counting', 'comparison'],
-  2: ['counting', 'comparison', 'addition', 'subtraction'],
-  3: ['comparison', 'addition', 'subtraction', 'fill_blank', 'word_problem'],
-  4: ['addition', 'subtraction', 'multiplication', 'fill_blank', 'word_problem'],
+  1: ['counting', 'comparison', 'shapes', 'patterns'],
+  2: ['counting', 'comparison', 'shapes', 'patterns', 'addition', 'subtraction'],
+  3: ['counting', 'comparison', 'addition', 'subtraction', 'fill_blank', 'word_problem'],
+  4: ['comparison', 'addition', 'subtraction', 'fill_blank', 'word_problem'],
   5: ['addition', 'subtraction', 'multiplication', 'division', 'fill_blank', 'word_problem'],
+  6: ['addition', 'subtraction', 'multiplication', 'division', 'fill_blank', 'word_problem'],
 };
 
 /** 题目选项 */
@@ -75,49 +84,49 @@ export interface Question {
   id: string;
   type: QuestionType;
   level: Level;
-  questionText: string;    // 题目文字
-  choices: Choice[];       // 选项（4个）
-  correctAnswer: number;  // 正确答案
-  explanation?: string;    // 解析（可选）
+  questionText: string;
+  choices: Choice[];
+  correctAnswer: number;
+  explanation?: string;
 }
 
 /** 用户的一次作答记录 */
 export interface AnswerRecord {
   question: Question;
-  selectedAnswer: number | null; // null 表示未作答
+  selectedAnswer: number | null;
   isCorrect: boolean;
-  timeSpentMs: number;  // 答题耗时
+  timeSpentMs: number;
 }
 
 /** 评估状态 */
 export interface AssessmentState {
-  currentLevel: number;         // 当前测试难度（允许小数，用于平滑调整）
-  currentQuestionIndex: number; // 当前第几题
-  totalQuestions: number;       // 总题数
-  answerHistory: AnswerRecord[];// 答题历史
-  isComplete: boolean;          // 测试是否完成
-  streakCorrect: number;        // 连续答对数
-  streakWrong: number;          // 连续答错数
+  currentLevel: number;
+  currentQuestionIndex: number;
+  totalQuestions: number;
+  answerHistory: AnswerRecord[];
+  isComplete: boolean;
+  streakCorrect: number;
+  streakWrong: number;
 }
 
 /** 评估结果 */
 export interface AssessmentResult {
-  finalLevel: Level;            // 最终等级
-  score: number;                // 总正确率 (0-100)
+  finalLevel: Level;
+  score: number;
   totalCorrect: number;
   totalQuestions: number;
-  levelScores: Record<Level, { correct: number; total: number }>; // 各等级正确率
+  levelScores: Record<Level, { correct: number; total: number }>;
   answerHistory: AnswerRecord[];
-  suggestion: string;           // 学习建议
+  suggestion: string;
 }
 
 /** 练习题配置 */
 export interface WorksheetConfig {
   level: Level;
-  questionCount: number;        // 题目数量 (10-50)
-  questionTypes: QuestionType[]; // 选中的题型
-  includeAnswerSheet: boolean;  // 是否附带答案页
-  title?: string;               // 自定义标题
+  questionCount: number;
+  questionTypes: QuestionType[];
+  includeAnswerSheet: boolean;
+  title?: string;
 }
 
 /** 练习题 */
@@ -126,7 +135,7 @@ export interface WorksheetProblem {
   type: QuestionType;
   questionText: string;
   answer: number;
-  showWorkSpace?: boolean; // 是否显示答题区
+  showWorkSpace?: boolean;
 }
 
 /** API 响应格式 */

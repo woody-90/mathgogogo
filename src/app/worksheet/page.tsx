@@ -12,14 +12,14 @@ import {
 import LevelBadge from '@/components/LevelBadge';
 import WorksheetPreview from '@/components/WorksheetPreview';
 
-const ALL_LEVELS: Level[] = [1, 2, 3, 4, 5];
+const ALL_LEVELS: Level[] = [1, 2, 3, 4, 5, 6];
 
 function WorksheetContent() {
   const searchParams = useSearchParams();
   const levelFromUrl = Number(searchParams.get('level')) as Level;
 
   const [level, setLevel] = useState<Level>(
-    levelFromUrl >= 1 && levelFromUrl <= 5 ? levelFromUrl : 3
+    levelFromUrl >= 1 && levelFromUrl <= 6 ? levelFromUrl : 3
   );
   const [questionCount, setQuestionCount] = useState(20);
   const [selectedTypes, setSelectedTypes] = useState<QuestionType[]>([]);

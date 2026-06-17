@@ -4,14 +4,15 @@ import Link from 'next/link';
 import { LEVEL_NAMES, LEVEL_DESCRIPTIONS } from '@/types';
 import type { Level } from '@/types';
 
-const LEVELS: Level[] = [1, 2, 3, 4, 5];
+const LEVELS: Level[] = [1, 2, 3, 4, 5, 6];
 
 const LEVEL_EMOJIS: Record<Level, string> = {
   1: '🌱',
   2: '🌿',
   3: '🌳',
-  4: '🚀',
-  5: '⭐',
+  4: '📘',
+  5: '🚀',
+  6: '⭐',
 };
 
 export default function Home() {

@@ -99,7 +99,7 @@ export default function ResultPage() {
             📊 各等级答题表现
           </h3>
           <div className="space-y-3">
-            {([1, 2, 3, 4, 5] as Level[]).map((lv) => {
+            {([1, 2, 3, 4, 5, 6] as Level[]).map((lv) => {
               const ls = result.levelScores[lv];
               if (ls.total === 0) return null;
               const rate = Math.round((ls.correct / ls.total) * 100);
