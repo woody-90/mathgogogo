@@ -1,11 +1,9 @@
 // ============================================================
 // MathGoGoGo - PDF 练习题生成器
-// 嵌入中文字体，完美支持中文题目
+// 支持浏览器端运行（通过 fetch 加载字体）
 // ============================================================
 
 import jsPDF from 'jspdf';
-import fs from 'fs';
-import path from 'path';
 import { Level, QuestionType, LEVEL_NAMES } from '@/types';
 import { generateWorksheetProblems } from './question-bank';
 
@@ -13,43 +11,55 @@ interface WorksheetConfig {
   level: Level;
   questionCount: number;
   questionTypes: QuestionType[];
-  includeAnswerSheet: boolean;
   title?: string;
 }
 
-// 预加载中文字体（模块加载时执行一次）
-const fontPath = path.join(process.cwd(), 'public/fonts/STHeiti-Subset.ttf');
-const fontBase64 = fs.readFileSync(fontPath).toString('base64');
 const FONT_NAME = 'STHeitiCN';
+let fontLoaded = false;
+let fontBase64: string | null = null;
 
-function registerFont(doc: jsPDF) {
-  // 只在第一次调用时注册
-  try {
-    doc.addFileToVFS('STHeiti-Subset.ttf', fontBase64);
-    doc.addFont('STHeiti-Subset.ttf', FONT_NAME, 'normal');
-  } catch {
-    // 字体已注册则忽略
+/** 加载中文字体（浏览器端通过 fetch 加载） */
+async function ensureFont(doc: jsPDF): Promise<void> {
+  if (fontLoaded) {
+    try {
+      doc.addFileToVFS('STHeiti-Subset.ttf', fontBase64!);
+      doc.addFont('STHeiti-Subset.ttf', FONT_NAME, 'normal');
+      return;
+    } catch { /* already registered */ }
   }
+
+  if (!fontBase64) {
+    // 获取 basePath（兼容 GitHub Pages 子路径部署）
+    const baseEl = document.querySelector('base');
+    const basePath = baseEl?.getAttribute('href') || '/';
+    const fontUrl = `${basePath}fonts/STHeiti-Subset.ttf`.replace('//', '/');
+    const resp = await fetch(fontUrl);
+    const blob = await resp.blob();
+    fontBase64 = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(',')[1]);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  doc.addFileToVFS('STHeiti-Subset.ttf', fontBase64);
+  doc.addFont('STHeiti-Subset.ttf', FONT_NAME, 'normal');
+  fontLoaded = true;
 }
 
-/** 生成练习题 PDF 并返回 Buffer */
-export async function generateWorksheetPDF(config: WorksheetConfig): Promise<Buffer> {
+/** 生成练习题 PDF 并返回 Blob（浏览器端直接下载用） */
+export async function generateWorksheetPDF(config: WorksheetConfig): Promise<Blob> {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4',
   });
 
-  // 注册中文字体
-  registerFont(doc);
+  await ensureFont(doc);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-
-  const ml = 18;
-  const mr = 18;
-  const mt = 18;
-  const mb = 18;
+  const ml = 18, mr = 18, mt = 18, mb = 18;
   const cw = pageWidth - ml - mr;
 
   function hLine(y: number) {
@@ -64,12 +74,7 @@ export async function generateWorksheetPDF(config: WorksheetConfig): Promise<Buf
     doc.line(ml, y, pageWidth - mr, y);
   }
 
-  // ---- 生成题目 ----
-  const problems = generateWorksheetProblems(
-    config.level,
-    config.questionCount,
-    config.questionTypes
-  );
+  const problems = generateWorksheetProblems(config.level, config.questionCount, config.questionTypes);
 
   // ---- 标题 ----
   const titleY = mt + 6;
@@ -88,23 +93,11 @@ export async function generateWorksheetPDF(config: WorksheetConfig): Promise<Buf
 
   // ---- 题目区 ----
   const startY = infoY + 14;
-  const useTwoCols = config.questionCount > 20;
-  const cols = useTwoCols ? 2 : 1;
-  const colGap = useTwoCols ? 10 : 0;
+  const cols = config.questionCount > 20 ? 2 : 1;
+  const colGap = cols === 2 ? 10 : 0;
   const colW = (cw - colGap * (cols - 1)) / cols;
-
-  // 动态调整字号和行距
-  const rowH =
-    config.questionCount <= 10 ? 16
-    : config.questionCount <= 20 ? 13
-    : config.questionCount <= 35 ? 11
-    : 9;
-  const fontSize =
-    config.questionCount <= 10 ? 13
-    : config.questionCount <= 20 ? 11
-    : config.questionCount <= 35 ? 10
-    : 8;
-
+  const rowH = config.questionCount <= 10 ? 16 : config.questionCount <= 20 ? 13 : 11;
+  const fontSize = config.questionCount <= 10 ? 13 : config.questionCount <= 20 ? 11 : 10;
   const perCol = Math.ceil(problems.length / cols);
 
   doc.setFont(FONT_NAME, 'normal');
@@ -116,14 +109,8 @@ export async function generateWorksheetPDF(config: WorksheetConfig): Promise<Buf
     const row = i % perCol;
     const x = ml + col * (colW + colGap);
     const y = startY + row * rowH;
-
     if (y > pageHeight - mb - 5) return;
-
-    // 题号加粗
-    doc.setFont(FONT_NAME, 'normal');
-    doc.text(`${problem.index}. ${problem.questionText} = _______`, x, y, {
-      maxWidth: colW,
-    });
+    doc.text(`${problem.index}. ${problem.questionText} = _______`, x, y, { maxWidth: colW });
   });
 
   // ---- 页脚 ----
@@ -133,5 +120,18 @@ export async function generateWorksheetPDF(config: WorksheetConfig): Promise<Buf
   doc.text('MathGoGoGo · 快乐学数学', pageWidth / 2, footerY, { align: 'center' });
   thinLine(pageHeight - mb + 3);
 
-  return Buffer.from(doc.output('arraybuffer'));
+  return doc.output('blob');
+}
+
+/** 生成并触发下载 */
+export async function downloadWorksheet(config: WorksheetConfig): Promise<void> {
+  const blob = await generateWorksheetPDF(config);
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `math-worksheet-level-${config.level}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
 }

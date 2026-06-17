@@ -11,6 +11,7 @@ import {
 } from '@/types';
 import LevelBadge from '@/components/LevelBadge';
 import WorksheetPreview from '@/components/WorksheetPreview';
+import { downloadWorksheet } from '@/lib/pdf-generator';
 
 const ALL_LEVELS: Level[] = [1, 2, 3, 4, 5, 6];
 
@@ -46,37 +47,10 @@ function WorksheetContent() {
     setError(null);
 
     try {
-      const types =
-        selectedTypes.length > 0 ? selectedTypes : LEVEL_QUESTION_TYPES[level];
-
-      const res = await fetch('/api/worksheet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          level,
-          questionCount,
-          questionTypes: types,
-          includeAnswerSheet: false,
-        }),
-      });
-
-      if (!res.ok) {
-        const json = await res.json().catch(() => null);
-        setError(json?.error || 'PDF 生成失败，请重试');
-        return;
-      }
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `math-worksheet-level-${level}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      const types = selectedTypes.length > 0 ? selectedTypes : LEVEL_QUESTION_TYPES[level];
+      await downloadWorksheet({ level, questionCount, questionTypes: types });
     } catch {
-      setError('网络错误，请检查网络连接后重试');
+      setError('PDF 生成失败，请重试');
     } finally {
       setIsDownloading(false);
     }
