@@ -11,7 +11,6 @@ import {
 } from '@/types';
 import LevelBadge from '@/components/LevelBadge';
 import WorksheetPreview from '@/components/WorksheetPreview';
-import { generatePrintHTML } from '@/lib/print-template';
 
 const ALL_LEVELS: Level[] = [1, 2, 3, 4, 5];
 
@@ -25,16 +24,15 @@ function WorksheetContent() {
   const [questionCount, setQuestionCount] = useState(20);
   const [selectedTypes, setSelectedTypes] = useState<QuestionType[]>([]);
   const [includeAnswers, setIncludeAnswers] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 切换题型选择
   const toggleType = useCallback((type: QuestionType) => {
     setSelectedTypes((prev) =>
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
     );
   }, []);
 
-  // 全部选择 / 取消
   const toggleAll = useCallback(() => {
     const allTypes = LEVEL_QUESTION_TYPES[level];
     if (selectedTypes.length === allTypes.length) {
@@ -44,30 +42,45 @@ function WorksheetContent() {
     }
   }, [level, selectedTypes]);
 
-  // 打开打印窗口
-  const handlePrint = useCallback(() => {
+  const handleDownload = useCallback(async () => {
+    setIsDownloading(true);
     setError(null);
 
-    const types =
-      selectedTypes.length > 0 ? selectedTypes : LEVEL_QUESTION_TYPES[level];
+    try {
+      const types =
+        selectedTypes.length > 0 ? selectedTypes : LEVEL_QUESTION_TYPES[level];
 
-    // 生成打印HTML
-    const html = generatePrintHTML({
-      level,
-      questionCount,
-      questionTypes: types,
-      includeAnswerSheet: includeAnswers,
-    });
+      const res = await fetch('/api/worksheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          level,
+          questionCount,
+          questionTypes: types,
+          includeAnswerSheet: includeAnswers,
+        }),
+      });
 
-    // 在新窗口打开
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      setError('请允许弹出窗口后再试');
-      return;
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        setError(json?.error || 'PDF 生成失败，请重试');
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `math-worksheet-level-${level}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setError('网络错误，请检查网络连接后重试');
+    } finally {
+      setIsDownloading(false);
     }
-
-    printWindow.document.write(html);
-    printWindow.document.close();
   }, [level, questionCount, selectedTypes, includeAnswers]);
 
   const availableTypes = LEVEL_QUESTION_TYPES[level];
@@ -75,20 +88,19 @@ function WorksheetContent() {
   return (
     <div className="flex-1 py-8 px-4">
       <div className="max-w-3xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-extrabold text-gray-800 mb-2">
             📄 生成练习题
           </h1>
           <p className="text-gray-500">
-            选择难度和题型，打印或保存为 PDF
+            选择难度和题型，下载可打印的 PDF 练习题
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 左侧：配置区 */}
+          {/* 左侧配置 */}
           <div className="space-y-5">
-            {/* 等级选择 */}
+            {/* 等级 */}
             <div className="card p-5">
               <label className="block font-bold text-gray-700 mb-3">
                 📚 选择难度等级
@@ -119,7 +131,7 @@ function WorksheetContent() {
               </div>
             </div>
 
-            {/* 题量选择 */}
+            {/* 题量 */}
             <div className="card p-5">
               <label className="block font-bold text-gray-700 mb-3">
                 🔢 题目数量：
@@ -141,7 +153,7 @@ function WorksheetContent() {
               </div>
             </div>
 
-            {/* 题型选择 */}
+            {/* 题型 */}
             <div className="card p-5">
               <div className="flex items-center justify-between mb-3">
                 <label className="font-bold text-gray-700">
@@ -177,7 +189,7 @@ function WorksheetContent() {
               </p>
             </div>
 
-            {/* 答案页选项 */}
+            {/* 答案页 */}
             <div className="card p-5">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
@@ -192,16 +204,21 @@ function WorksheetContent() {
               </label>
             </div>
 
-            {/* 打印按钮 */}
+            {/* 下载按钮 */}
             <button
-              onClick={handlePrint}
-              className="btn-primary w-full text-xl py-4"
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="btn-primary w-full text-xl py-4 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              🖨️ 打印练习题
+              {isDownloading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="animate-spin">⏳</span>
+                  正在生成...
+                </span>
+              ) : (
+                '⬇️ 下载练习题 PDF'
+              )}
             </button>
-            <p className="text-xs text-gray-400 text-center -mt-3">
-              💡 点击后自动打开打印窗口，在打印对话框中选择「另存为 PDF」即可保存
-            </p>
 
             {error && (
               <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl text-center">
@@ -210,7 +227,7 @@ function WorksheetContent() {
             )}
           </div>
 
-          {/* 右侧：预览区 */}
+          {/* 右侧预览 */}
           <div>
             <div className="sticky top-4">
               <h3 className="font-bold text-gray-700 mb-3 text-center">
