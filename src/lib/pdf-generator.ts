@@ -17,55 +17,89 @@ interface WorksheetConfig {
 }
 
 /**
- * 根据题型生成 PDF 友好的纯数字/符号题目文本
+ * 从中文题目文本中提取数字，拼成纯数字/符号的算式
+ * 这样 PDF 完全不依赖中文，也不会出现 "Solve: ___" 这种无意义占位
  */
 function formatProblemForPDF(
   type: QuestionType,
-  answer: number,
-  index: number
+  questionText: string,
+  answer: number
 ): string {
-  // 根据题型和答案反推一个干净的算式
-  // （避免使用原始中文题目文本）
+  // 提取文本中所有的数字
+  const numbers = questionText.match(/\d+/g)?.map(Number) || [];
+
   switch (type) {
-    case 'counting':
-      return `Count and write the number = ___`;
-    case 'comparison':
-      return `___ (fill in: >, <, or =)`;
-    case 'addition': {
-      const b = Math.floor(Math.random() * Math.min(answer, 20)) + 1;
-      const a = answer - b;
-      return `${a} + ${b} = ___`;
+    case 'counting': {
+      // 数数题：文本中包含 count 个相同 emoji，提取数量
+      return `Count and write: ___`;
     }
-    case 'subtraction': {
-      const b = Math.floor(Math.random() * 10) + 1;
-      const a = answer + b;
-      return `${a} - ${b} = ___`;
-    }
-    case 'multiplication': {
-      // Find a factor pair
-      const factors = [];
-      for (let i = 2; i <= 9; i++) {
-        if (answer % i === 0 && answer / i <= 9) {
-          factors.push(i);
-        }
+
+    case 'comparison': {
+      // 比较题：文本中有两个数字，如 "比较大小：8 ○ 10"
+      if (numbers.length >= 2) {
+        return `Compare: ${numbers[0]} ___ ${numbers[1]}`;
       }
-      const b = factors.length > 0 ? factors[Math.floor(Math.random() * factors.length)] : 3;
-      const a = answer / b;
-      return `${a} x ${b} = ___`;
+      return `Compare the numbers: ___`;
     }
+
+    case 'addition': {
+      // 加法：文本如 "8 + 5 = ？"
+      if (numbers.length >= 2) {
+        return `${numbers[0]} + ${numbers[1]} = ___`;
+      }
+      return `___ + ___ = ___`;
+    }
+
+    case 'subtraction': {
+      // 减法：文本如 "18 - 9 = ？"
+      if (numbers.length >= 2) {
+        return `${numbers[0]} - ${numbers[1]} = ___`;
+      }
+      return `___ - ___ = ___`;
+    }
+
+    case 'multiplication': {
+      // 乘法：文本如 "6 × 7 = ？"
+      if (numbers.length >= 2) {
+        return `${numbers[0]} x ${numbers[1]} = ___`;
+      }
+      return `___ x ___ = ___`;
+    }
+
     case 'division': {
-      const b = Math.floor(Math.random() * 6) + 2;
-      const a = answer * b;
-      return `${a} / ${b} = ___`;
+      // 除法：文本如 "42 ÷ 6 = ？"
+      if (numbers.length >= 2) {
+        return `${numbers[0]} / ${numbers[1]} = ___`;
+      }
+      return `___ / ___ = ___`;
     }
+
     case 'fill_blank': {
-      const b = Math.floor(Math.random() * Math.min(answer, 9)) + 1;
-      return `___ + ${b} = ${answer + b}`;
+      // 填空：文本如 "? + 8 = 15" 或 "? - 3 = 7"
+      if (numbers.length >= 2) {
+        return `___ + ${numbers[0]} = ${numbers[1]}`;
+      }
+      return `___ = ${answer}`;
     }
-    case 'word_problem':
-      return `Solve: ___`;
+
+    case 'word_problem': {
+      // 应用题：提取数字拼成算式
+      if (numbers.length >= 2) {
+        // 尝试判断运算类型
+        const sum = numbers.reduce((a, b) => a + b, 0);
+        if (sum === answer) return `${numbers.join(' + ')} = ___`;
+        const diff = numbers[0] - numbers.slice(1).reduce((a, b) => a + b, 0);
+        if (diff === answer) return `${numbers[0]} - ${numbers.slice(1).join(' - ')} = ___`;
+        const prod = numbers.reduce((a, b) => a * b, 1);
+        if (prod === answer) return `${numbers.join(' x ')} = ___`;
+        // 默认用前两个数字
+        return `${numbers[0]} + ${numbers[1]} = ___`;
+      }
+      return `Solve and write the answer: ___`;
+    }
+
     default:
-      return `Problem ${index}: ___`;
+      return `Problem: ___`;
   }
 }
 
@@ -163,7 +197,7 @@ export async function generateWorksheetPDF(config: WorksheetConfig): Promise<Buf
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(50, 50, 50);
 
-    const text = formatProblemForPDF(problem.type, problem.answer, problem.index);
+    const text = formatProblemForPDF(problem.type, problem.questionText, problem.answer);
     doc.text(text, x + 8, y);
   });
 
