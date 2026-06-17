@@ -18,6 +18,23 @@ const FONT_NAME = 'STHeitiCN';
 let fontLoaded = false;
 let fontBase64: string | null = null;
 
+/** 从当前 URL 自动检测 basePath（兼容 GitHub Pages 子路径） */
+function getBasePath(): string {
+  // 例如 /mathgogogo/worksheet → /mathgogogo
+  // 例如 /worksheet → 空字符串
+  const path = window.location.pathname;
+  const match = path.match(/^(\/[^/]+)\//);
+  // 如果子路径包含常见的 repo 名称模式，使用它；否则留空
+  if (match && match[1] !== '') {
+    // 排除常见的 Next.js 路由路径
+    const knownRoutes = ['/assessment', '/result', '/worksheet', '/_next'];
+    if (!knownRoutes.includes(match[1])) {
+      return match[1];
+    }
+  }
+  return '';
+}
+
 /** 加载中文字体（浏览器端通过 fetch 加载） */
 async function ensureFont(doc: jsPDF): Promise<void> {
   if (fontLoaded) {
@@ -29,11 +46,10 @@ async function ensureFont(doc: jsPDF): Promise<void> {
   }
 
   if (!fontBase64) {
-    // 获取 basePath（兼容 GitHub Pages 子路径部署）
-    const baseEl = document.querySelector('base');
-    const basePath = baseEl?.getAttribute('href') || '/';
-    const fontUrl = `${basePath}fonts/STHeiti-Subset.ttf`.replace('//', '/');
+    const basePath = getBasePath();
+    const fontUrl = `${basePath}/fonts/STHeiti-Subset.ttf`;
     const resp = await fetch(fontUrl);
+    if (!resp.ok) throw new Error(`Font load failed: ${resp.status}`);
     const blob = await resp.blob();
     fontBase64 = await new Promise<string>((resolve) => {
       const reader = new FileReader();
