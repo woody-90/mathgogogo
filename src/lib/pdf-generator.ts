@@ -14,6 +14,25 @@ interface WorksheetConfig {
   title?: string;
 }
 
+/** 将 emoji 替换为纯文字描述（PDF 不能渲染彩色 emoji） */
+function replaceEmoji(text: string): string {
+  const map: Record<string, string> = {
+    '🔴': '(红)', '🔵': '(蓝)', '🟡': '(黄)', '🟢': '(绿)', '❤️': '(红心)',
+    '⭐': '★', '🌟': '★', '✨': '*',
+    '🍎': '[苹果]', '🌸': '[花]', '🐱': '[猫]', '🎈': '[气球]',
+    '🐶': '[狗]', '🍪': '[饼干]', '🦋': '[蝴蝶]', '🐟': '[鱼]', '🍬': '[糖]',
+    '📦': '[盒子]', '⚽': '[球]', '🎲': '[骰子]', '📐': '[尺子]',
+    '🥫': '[罐头]', '🥚': '[蛋]', '🌙': '[月亮]',
+    '🧮': '', '📋': '', '📄': '', '📘': '', '📊': '', '📚': '',
+    '🌱': '', '🌿': '', '🌳': '', '🚀': '', '☀️': '', '🌍': '',
+  };
+  let result = text;
+  for (const [emoji, replacement] of Object.entries(map)) {
+    result = result.split(emoji).join(replacement);
+  }
+  return result;
+}
+
 const FONT_NAME = 'STHeitiCN';
 let fontLoaded = false;
 let fontBase64: string | null = null;
@@ -126,7 +145,8 @@ export async function generateWorksheetPDF(config: WorksheetConfig): Promise<Blo
     const x = ml + col * (colW + colGap);
     const y = startY + row * rowH;
     if (y > pageHeight - mb - 5) return;
-    doc.text(`${problem.index}. ${problem.questionText} = _______`, x, y, { maxWidth: colW });
+    const displayText = replaceEmoji(problem.questionText);
+    doc.text(`${problem.index}. ${displayText} = _______`, x, y, { maxWidth: colW });
   });
 
   // ---- 页脚 ----
