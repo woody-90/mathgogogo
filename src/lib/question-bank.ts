@@ -302,7 +302,8 @@ function genWordProblem(level: Level): Question {
 
 /** 图形识别题 */
 function genShapes(level: Level): Question {
-  const shapes = level <= 2
+  // 当前等级可用的图形
+  const available = level <= 2
     ? ['圆形 ○', '正方形 □', '三角形 △']
     : ['圆形 ○', '正方形 □', '三角形 △', '长方形 ▭', '椭圆形 ⬭'];
 
@@ -311,72 +312,89 @@ function genShapes(level: Level): Question {
     : ['圆形', '正方形', '三角形', '长方形', '椭圆形'];
 
   const correctIdx = randInt(0, names.length - 1);
+  const correctLabel = available[correctIdx];
+  const correctName = names[correctIdx];
 
-  // 生成选项：用不同的 shape 名称
-  const allShapes = ['圆形', '正方形', '三角形', '长方形', '椭圆形'];
-  const distractors = allShapes.filter((_, i) => i !== correctIdx || i >= names.length);
-  const choices: Choice[] = [
-    { value: correctIdx, label: shapes[correctIdx] },
-    ...shuffle(
-      distractors.slice(0, 3).map((name, i) => {
-        const shapeText = shapes[allShapes.indexOf(name)] || name;
-        return { value: 99, label: shapeText };
-      })
-    ),
-  ];
-  // 修正：所有选项的 value 重新编排
-  const finalChoices = shuffle(
-    choices.map((c, i) => ({ ...c, value: i }))
+  // 从当前等级的其他图形中选干扰项（不重复）
+  const others = available.filter((_, i) => i !== correctIdx);
+  const shuffledOthers = shuffle(others);
+  // 选项数量：不超过可用图形数，最少 2 个
+  const optionCount = Math.min(shuffledOthers.length + 1, Math.max(2, available.length));
+
+  const optionLabels = [correctLabel, ...shuffledOthers.slice(0, optionCount - 1)];
+
+  const choices: Choice[] = shuffle(
+    optionLabels.map((label, i) => ({ value: i, label }))
   );
-  const correctValue = finalChoices.findIndex((c) => c.label === shapes[correctIdx]);
+  const correctValue = choices.findIndex((c) => c.label === correctLabel);
 
   return {
     id: uid(), type: 'shapes', level,
-    questionText: `下面哪个是 ${names[correctIdx]}？`,
-    choices: finalChoices,
+    questionText: `下面哪个是 ${correctName}？`,
+    choices,
     correctAnswer: correctValue,
-    explanation: `${shapes[correctIdx]} 就是 ${names[correctIdx]}`,
+    explanation: `${correctLabel} 就是 ${correctName}`,
   };
 }
 
 /** 规律推理题 */
 function genPatterns(level: Level): Question {
-  // 生成规律序列
   const emojis = ['🔴', '🔵', '🟡', '🟢', '⭐', '❤️'];
   const patternType = level <= 1
-    ? 'AB'  // 小班只做 AB
+    ? 'AB'
     : level === 2
-    ? ['AB', 'AAB'][randInt(0, 1)]  // 中班 AB / AAB
-    : ['AB', 'AAB', 'ABC'][randInt(0, 2)];  // 大班及以上 ABC
+    ? ['AB', 'AAB'][randInt(0, 1)]
+    : ['AB', 'AAB', 'ABC'][randInt(0, 2)];
 
   let sequence: string[];
   let nextItem: string;
+  let uniqueItems: Set<string>;
 
   if (patternType === 'AB') {
+    // 确保 a 和 b 不同
     const a = emojis[randInt(0, 3)];
-    const b = emojis[randInt(0, 3)];
+    let b = emojis[randInt(0, 3)];
+    while (b === a) b = emojis[randInt(0, 3)];
     sequence = [a, b, a, b, a];
     nextItem = b;
+    uniqueItems = new Set([a, b]);
   } else if (patternType === 'AAB') {
     const a = emojis[randInt(0, 3)];
-    const b = emojis[randInt(0, 3)];
+    let b = emojis[randInt(0, 3)];
+    while (b === a) b = emojis[randInt(0, 3)];
     sequence = [a, a, b, a, a];
     nextItem = b;
+    uniqueItems = new Set([a, b]);
   } else {
+    // ABC: 三个都不同
     const a = emojis[randInt(0, 3)];
-    const b = emojis[randInt(0, 3)];
-    const c = emojis[randInt(0, 3)];
+    let b = emojis[randInt(0, 3)];
+    while (b === a) b = emojis[randInt(0, 3)];
+    let c = emojis[randInt(0, 3)];
+    while (c === a || c === b) c = emojis[randInt(0, 3)];
     sequence = [a, b, c, a, b];
     nextItem = c;
+    uniqueItems = new Set([a, b, c]);
   }
 
   const seqStr = sequence.join(' ');
-  const choices = shuffle([
-    { value: 0, label: nextItem },
-    { value: 1, label: sequence[0] },
-    { value: 2, label: sequence[1] },
-    { value: 3, label: sequence.length > 2 ? sequence[2] : sequence[0] },
-  ]);
+
+  // 根据独立选项数量决定选项个数（2个独立项 → 2选项，3个 → 3-4选项）
+  const distinctItems = [...uniqueItems];
+  const optionCount = distinctItems.length === 2 ? 2 : Math.min(4, distinctItems.length + 1);
+
+  // 构建选项：包含正确答案和干扰项
+  const options: string[] = [nextItem];
+  // 从其他 emoji 中选干扰项
+  const distractors = emojis.filter((e) => e !== nextItem);
+  while (options.length < optionCount && distractors.length > 0) {
+    const d = distractors[randInt(0, distractors.length - 1)];
+    if (!options.includes(d)) options.push(d);
+  }
+
+  const choices: Choice[] = shuffle(
+    options.map((label, i) => ({ value: i, label }))
+  );
   const correctValue = choices.findIndex((c) => c.label === nextItem);
 
   return {
