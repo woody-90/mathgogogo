@@ -172,6 +172,30 @@ function genDivision(level: Level): Question {
 function genFillBlank(level: Level): Question {
   const p = LP[level];
 
+  // 高等级增加乘除法填空
+  if (level >= 5 && Math.random() < 0.3) {
+    // 乘除法填空
+    const a = randInt(2, p.mulMax);
+    const b = randInt(2, level <= 5 ? 5 : 9);
+    const result = a * b;
+    if (Math.random() > 0.5) {
+      return {
+        id: uid(), type: 'fill_blank', level,
+        questionText: `? × ${a} = ${result}，问号处应该填几？`,
+        choices: generateChoices(b, makeDistractors(b)),
+        correctAnswer: b,
+      };
+    } else {
+      return {
+        id: uid(), type: 'fill_blank', level,
+        questionText: `${result} ÷ ${a} = ？，问号处应该填几？`,
+        choices: generateChoices(b, makeDistractors(b)),
+        correctAnswer: b,
+      };
+    }
+  }
+
+  // 加减法填空
   if (Math.random() > 0.5) {
     const b = randInt(1, Math.min(20, p.addMax - 1));
     const correct = randInt(1, Math.min(20, p.addMax - b));
@@ -237,25 +261,54 @@ function genWordProblem(level: Level): Question {
   ];
 
   // ---- 进阶应用题（等级 4-6）----
-  const hardTemplates = [
+  // 比多比少（一年级重点）
+  const grade1Templates = [
     () => {
-      const a = randInt(10, 50);
-      const b = randInt(5, 30);
-      const items = ['苹果', '糖果', '铅笔', '书本'];
-      const item = items[randInt(0, items.length - 1)];
+      const a = randInt(30, 80);
+      const b = randInt(10, a - 5);
       return {
-        text: `小明有 ${a} 个${item}，妈妈又给了他 ${b} 个，现在一共有几个？`,
-        answer: a + b,
+        text: `图书馆有故事书 ${a} 本，科技书 ${b} 本。故事书比科技书多多少本？`,
+        answer: a - b,
       };
     },
     () => {
-      const a = randInt(20, 100);
-      const b = randInt(5, a - 1);
-      const items = ['苹果', '糖果', '饼干', '弹珠'];
+      const a = randInt(20, 70);
+      const b = randInt(10, a - 3);
+      return {
+        text: `小红做了 ${a} 道口算题，小华做了 ${b} 道。小红比小华多做了几道？`,
+        answer: a - b,
+      };
+    },
+    () => {
+      const a = randInt(20, 60);
+      const b = randInt(10, 40);
+      const items = ['个苹果', '本书', '支铅笔', '块糖'];
       const item = items[randInt(0, items.length - 1)];
       return {
-        text: `小华有 ${a} 个${item}，吃了 ${b} 个，还剩几个？`,
+        text: `妈妈买了 ${a} ${item}，吃了 ${b} 个，还剩多少个？`,
         answer: a - b,
+      };
+    },
+  ];
+
+  // 归一归总（二三年级重点）
+  const grade2Templates = [
+    () => {
+      const unitPrice = randInt(3, 8);
+      const qty1 = randInt(3, 6);
+      const qty2 = randInt(4, 8);
+      return {
+        text: `买 ${qty1} 个同样的笔记本花了 ${unitPrice * qty1} 元，买 ${qty2} 个需要多少钱？`,
+        answer: unitPrice * qty2,
+      };
+    },
+    () => {
+      const perDay = randInt(6, 12);
+      const days = randInt(4, 8);
+      const newDays = randInt(3, 7);
+      return {
+        text: `每天看 ${perDay} 页书，${days} 天看完。如果每天看 ${newDays + 3} 页，几天看完？`,
+        answer: Math.round(perDay * days / (newDays + 3)),
       };
     },
     () => {
@@ -266,28 +319,46 @@ function genWordProblem(level: Level): Question {
         answer: a * b,
       };
     },
+  ];
+
+  // 行程、搭配（三年级）
+  const grade3Templates = [
     () => {
-      const b = randInt(2, 6);
-      const q = randInt(2, 8);
-      const items = ['糖果', '铅笔', '饼干', '贴纸'];
-      const item = items[randInt(0, items.length - 1)];
+      const distance = randInt(120, 500);
+      const speed = randInt(40, 80);
       return {
-        text: `老师把 ${b * q} 个${item}平均分给 ${b} 个小朋友，每人几个？`,
-        answer: q,
+        text: `两地相距 ${distance} 千米，一辆汽车每小时行 ${speed} 千米，几小时到达？`,
+        answer: Math.round(distance / speed),
       };
     },
     () => {
-      const a = randInt(10, 50);
-      const b = randInt(1, Math.min(20, a));
-      const c = randInt(5, 20);
+      const tops = randInt(3, 5);
+      const pants = randInt(2, 4);
       return {
-        text: `小红有 ${a} 元，买文具花了 ${b} 元，奶奶又给了 ${c} 元，现在有多少元？`,
-        answer: a - b + c,
+        text: `有 ${tops} 件上衣和 ${pants} 条裤子，一共有多少种不同的搭配？`,
+        answer: tops * pants,
+      };
+    },
+    () => {
+      const total = randInt(200, 600);
+      const hours = randInt(3, 6);
+      return {
+        text: `一台机器 ${hours} 小时生产 ${total} 个零件，每小时生产多少个？`,
+        answer: Math.round(total / hours),
       };
     },
   ];
 
-  const templates = level <= 3 ? easyTemplates : hardTemplates;
+  let templates;
+  if (level <= 3) {
+    templates = easyTemplates;
+  } else if (level === 4) {
+    templates = [...grade1Templates, ...easyTemplates.slice(0, 2)];
+  } else if (level === 5) {
+    templates = grade2Templates;
+  } else {
+    templates = [...grade3Templates, ...grade2Templates];
+  }
   const t = templates[randInt(0, templates.length - 1)];
   const { text, answer } = t();
 
