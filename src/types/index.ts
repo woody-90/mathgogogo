@@ -47,7 +47,8 @@ export type QuestionType =
   | 'fill_blank'     // 填空
   | 'word_problem'   // 应用题
   | 'shapes'         // 图形识别
-  | 'patterns';      // 规律推理
+  | 'patterns'       // 规律推理
+  | 'time';          // 认识钟表
 
 /** 题型名称（中文） */
 export const QUESTION_TYPE_NAMES: Record<QuestionType, string> = {
@@ -61,15 +62,16 @@ export const QUESTION_TYPE_NAMES: Record<QuestionType, string> = {
   word_problem: '应用题',
   shapes: '图形',
   patterns: '规律',
+  time: '时钟',
 };
 
 /** 每个等级适用的题型 */
 export const LEVEL_QUESTION_TYPES: Record<Level, QuestionType[]> = {
   1: ['counting', 'comparison', 'shapes', 'patterns'],
   2: ['counting', 'comparison', 'shapes', 'patterns', 'addition', 'subtraction'],
-  3: ['counting', 'comparison', 'addition', 'subtraction', 'fill_blank', 'word_problem'],
-  4: ['comparison', 'addition', 'subtraction', 'fill_blank', 'word_problem'],
-  5: ['addition', 'subtraction', 'multiplication', 'division', 'fill_blank', 'word_problem'],
+  3: ['counting', 'comparison', 'addition', 'subtraction', 'fill_blank', 'word_problem', 'time'],
+  4: ['comparison', 'addition', 'subtraction', 'fill_blank', 'word_problem', 'time'],
+  5: ['addition', 'subtraction', 'multiplication', 'division', 'fill_blank', 'word_problem', 'time'],
   6: ['addition', 'subtraction', 'multiplication', 'division', 'fill_blank', 'word_problem'],
 };
 

@@ -373,99 +373,126 @@ function genWordProblem(level: Level): Question {
 
 /** 图形识别题 */
 function genShapes(level: Level): Question {
-  // 当前等级可用的图形
-  const available = level <= 2
-    ? ['圆形 ○', '正方形 □', '三角形 △']
-    : ['圆形 ○', '正方形 □', '三角形 △', '长方形 ▭', '椭圆形 ⬭'];
+  // 当前等级可用的图形（仅符号，用于选项显示）
+  const symbols = level <= 2
+    ? ['○', '□', '△']
+    : ['○', '□', '△', '▭', '⬭'];
 
   const names = level <= 2
     ? ['圆形', '正方形', '三角形']
     : ['圆形', '正方形', '三角形', '长方形', '椭圆形'];
 
   const correctIdx = randInt(0, names.length - 1);
-  const correctLabel = available[correctIdx];
+  const correctSymbol = symbols[correctIdx];
   const correctName = names[correctIdx];
 
   // 从当前等级的其他图形中选干扰项（不重复）
-  const others = available.filter((_, i) => i !== correctIdx);
-  const shuffledOthers = shuffle(others);
-  // 选项数量：不超过可用图形数，最少 2 个
-  const optionCount = Math.min(shuffledOthers.length + 1, Math.max(2, available.length));
+  const otherSymbols = symbols.filter((_, i) => i !== correctIdx);
+  const shuffledOthers = shuffle(otherSymbols);
+  const optionCount = Math.min(shuffledOthers.length + 1, symbols.length);
 
-  const optionLabels = [correctLabel, ...shuffledOthers.slice(0, optionCount - 1)];
+  const optionSymbols = [correctSymbol, ...shuffledOthers.slice(0, optionCount - 1)];
 
-  const choices: Choice[] = shuffle(
-    optionLabels.map((label, i) => ({ value: i, label }))
+  // 先打乱，再重新编号 value，确保 correctAnswer 与点击值一致
+  const shuffled = shuffle(
+    optionSymbols.map((s) => ({ value: 0, label: s }))
   );
-  const correctValue = choices.findIndex((c) => c.label === correctLabel);
+  const choices: Choice[] = shuffled.map((c, i) => ({ value: i, label: c.label }));
+  const correctValue = choices.findIndex((c) => c.label === correctSymbol);
 
   return {
     id: uid(), type: 'shapes', level,
     questionText: `下面哪个是 ${correctName}？`,
     choices,
     correctAnswer: correctValue,
-    explanation: `${correctLabel} 就是 ${correctName}`,
+    explanation: `${correctSymbol} 就是 ${correctName}`,
   };
 }
 
 /** 规律推理题 */
 function genPatterns(level: Level): Question {
-  const emojis = ['🔴', '🔵', '🟡', '🟢', '⭐', '❤️'];
-  const patternType = level <= 1
-    ? 'AB'
-    : level === 2
-    ? ['AB', 'AAB'][randInt(0, 1)]
-    : ['AB', 'AAB', 'ABC'][randInt(0, 2)];
+  const emojis = ['🔴', '🔵', '🟡', '🟢'];
 
-  let sequence: string[];
-  let nextItem: string;
-  let uniqueItems: Set<string>;
+  // 不同等级可用的规律类型
+  const typesLv1 = ['AB'];
+  const typesLv2 = ['AB', 'AAB', 'ABB'];
+  const typesLv3 = ['AB', 'AAB', 'ABB', 'ABA', 'ABC'];
 
-  if (patternType === 'AB') {
-    // 确保 a 和 b 不同
+  const pool = level <= 1 ? typesLv1 : level === 2 ? typesLv2 : typesLv3;
+  const patternType = pool[randInt(0, pool.length - 1)];
+
+  // 生成规律序列的函数
+  function pickTwo(): [string, string] {
     const a = emojis[randInt(0, 3)];
     let b = emojis[randInt(0, 3)];
     while (b === a) b = emojis[randInt(0, 3)];
-    sequence = [a, b, a, b, a];
-    nextItem = b;
-    uniqueItems = new Set([a, b]);
-  } else if (patternType === 'AAB') {
-    const a = emojis[randInt(0, 3)];
-    let b = emojis[randInt(0, 3)];
-    while (b === a) b = emojis[randInt(0, 3)];
-    sequence = [a, a, b, a, a];
-    nextItem = b;
-    uniqueItems = new Set([a, b]);
-  } else {
-    // ABC: 三个都不同
+    return [a, b];
+  }
+  function pickThree(): [string, string, string] {
     const a = emojis[randInt(0, 3)];
     let b = emojis[randInt(0, 3)];
     while (b === a) b = emojis[randInt(0, 3)];
     let c = emojis[randInt(0, 3)];
     while (c === a || c === b) c = emojis[randInt(0, 3)];
-    sequence = [a, b, c, a, b];
-    nextItem = c;
-    uniqueItems = new Set([a, b, c]);
+    return [a, b, c];
+  }
+
+  let sequence: string[];
+  let nextItem: string;
+  const uniqueItems = new Set<string>();
+
+  switch (patternType) {
+    case 'AB': {
+      const [a, b] = pickTwo();
+      sequence = [a, b, a, b, a]; nextItem = b;
+      uniqueItems.add(a); uniqueItems.add(b);
+      break;
+    }
+    case 'AAB': {
+      const [a, b] = pickTwo();
+      sequence = [a, a, b, a, a]; nextItem = b;
+      uniqueItems.add(a); uniqueItems.add(b);
+      break;
+    }
+    case 'ABB': {
+      const [a, b] = pickTwo();
+      sequence = [a, b, b, a, b]; nextItem = b;
+      uniqueItems.add(a); uniqueItems.add(b);
+      break;
+    }
+    case 'ABA': {
+      const [a, b] = pickTwo();
+      sequence = [a, b, a, a, b]; nextItem = a;
+      uniqueItems.add(a); uniqueItems.add(b);
+      break;
+    }
+    default: { // ABC
+      const [a, b, c] = pickThree();
+      sequence = [a, b, c, a, b]; nextItem = c;
+      uniqueItems.add(a); uniqueItems.add(b); uniqueItems.add(c);
+      break;
+    }
   }
 
   const seqStr = sequence.join(' ');
 
-  // 根据独立选项数量决定选项个数（2个独立项 → 2选项，3个 → 3-4选项）
-  const distinctItems = [...uniqueItems];
-  const optionCount = distinctItems.length === 2 ? 2 : Math.min(4, distinctItems.length + 1);
+  // 根据独立图案数量决定选项个数
+  const distinctCount = uniqueItems.size;
+  const optionCount = distinctCount <= 2 ? 2 : Math.min(4, distinctCount + 1);
 
-  // 构建选项：包含正确答案和干扰项
+  // 构建不重复选项
   const options: string[] = [nextItem];
-  // 从其他 emoji 中选干扰项
-  const distractors = emojis.filter((e) => e !== nextItem);
-  while (options.length < optionCount && distractors.length > 0) {
-    const d = distractors[randInt(0, distractors.length - 1)];
+  const distractors = shuffle(emojis.filter((e) => e !== nextItem));
+  for (const d of distractors) {
+    if (options.length >= optionCount) break;
     if (!options.includes(d)) options.push(d);
   }
 
-  const choices: Choice[] = shuffle(
-    options.map((label, i) => ({ value: i, label }))
+  // 先打乱再重新编号 value，确保 correctAnswer 与点击值一致
+  const shuffled = shuffle(
+    options.map((label) => ({ value: 0, label }))
   );
+  const choices: Choice[] = shuffled.map((c, i) => ({ value: i, label: c.label }));
   const correctValue = choices.findIndex((c) => c.label === nextItem);
 
   return {
@@ -475,6 +502,115 @@ function genPatterns(level: Level): Question {
     correctAnswer: correctValue,
     explanation: `规律是 ${patternType}，接下来应选 ${nextItem}`,
   };
+}
+
+/** 时钟题 */
+function genTime(level: Level): Question {
+  // 整点列表
+  const hours = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  if (level <= 3) {
+    // 大班：认识整点和半点
+    if (Math.random() > 0.5) {
+      // 整点
+      const h = hours[randInt(0, 11)];
+      const correct = h;
+      return {
+        id: uid(), type: 'time', level,
+        questionText: `钟面上，时针指向 ${h}，分针指向 12，是几时？`,
+        choices: generateChoices(correct, makeDistractors(correct)),
+        correctAnswer: correct,
+        explanation: `时针指向 ${h}，分针指向 12，就是 ${h} 时（${h}:00）`,
+      };
+    } else {
+      // 半点
+      const h = hours[randInt(0, 11)];
+      const correct = h; // 答案仍是几时
+      return {
+        id: uid(), type: 'time', level,
+        questionText: `钟面上，时针在 ${h} 和 ${h === 12 ? 1 : h + 1} 中间，分针指向 6，是几时半？`,
+        choices: generateChoices(correct, makeDistractors(correct)),
+        correctAnswer: correct,
+        explanation: `分针指向 6 就是半点，时针在 ${h} 和 ${h + 1} 中间，是 ${h} 时半（${h}:30）`,
+      };
+    }
+  } else if (level === 4) {
+    // 一年级：认识几时几分（5分钟一档）
+    const h = hours[randInt(0, 11)];
+    const m = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55][randInt(0, 11)];
+    if (m === 0) {
+      return {
+        id: uid(), type: 'time', level,
+        questionText: `钟面上，时针指向 ${h}，分针指向 12，是几时？`,
+        choices: generateChoices(h, makeDistractors(h)),
+        correctAnswer: h,
+      };
+    }
+    return {
+      id: uid(), type: 'time', level,
+      questionText: `钟面上，时针走过 ${h}，分针指向 ${m / 5}（即 ${m} 分钟），是几时几分？`,
+      choices: [
+        { value: 0, label: `${h}:${String(m).padStart(2, '0')}` },
+        { value: 1, label: `${h === 12 ? 1 : h + 1}:${String(m).padStart(2, '0')}` },
+        { value: 2, label: `${h}:${String((m + 5) % 60).padStart(2, '0')}` },
+        { value: 3, label: `${h === 1 ? 12 : h - 1}:${String(m).padStart(2, '0')}` },
+      ],
+      correctAnswer: 0,
+      explanation: `时针走过 ${h}，分针指向 ${m / 5}（${m} 分），就是 ${h}:${String(m).padStart(2, '0')}`,
+    };
+  } else {
+    // 二年级+：时间换算和经过时间
+    const template = randInt(0, 3);
+    if (template === 0) {
+      // 单位换算
+      const hours = randInt(1, 3);
+      const correct = hours * 60;
+      return {
+        id: uid(), type: 'time', level,
+        questionText: `${hours} 小时 = ？分钟`,
+        choices: generateChoices(correct, makeDistractors(correct)),
+        correctAnswer: correct,
+        explanation: `1 小时 = 60 分钟，${hours} 小时 = ${correct} 分钟`,
+      };
+    } else if (template === 1) {
+      const mins = [60, 120, 180, 90, 150][randInt(0, 4)];
+      const correct = mins / 60;
+      return {
+        id: uid(), type: 'time', level,
+        questionText: `${mins} 分钟 = ？小时`,
+        choices: generateChoices(correct, makeDistractors(correct)),
+        correctAnswer: correct,
+        explanation: `60 分钟 = 1 小时，${mins} 分钟 = ${correct} 小时`,
+      };
+    } else if (template === 2) {
+      // 经过时间
+      const startH = randInt(8, 10);
+      const startM = [0, 15, 30, 45][randInt(0, 3)];
+      const duration = randInt(1, 3) * 30 + randInt(0, 1) * 15;
+      const endTotal = startH * 60 + startM + duration;
+      const endH = Math.floor(endTotal / 60);
+      const endM = endTotal % 60;
+      const correct = duration;
+      return {
+        id: uid(), type: 'time', level,
+        questionText: `从 ${startH}:${String(startM).padStart(2, '0')} 到 ${endH}:${String(endM).padStart(2, '0')}，经过了多长时间（分钟）？`,
+        choices: generateChoices(correct, [correct + 15, correct + 30, correct - 15].filter((n) => n > 0)),
+        correctAnswer: correct,
+        explanation: `${endH}:${String(endM).padStart(2, '0')} - ${startH}:${String(startM).padStart(2, '0')} = ${duration} 分钟`,
+      };
+    } else {
+      // 1分钟 = 60秒
+      const mins = randInt(1, 5);
+      const correct = mins * 60;
+      return {
+        id: uid(), type: 'time', level,
+        questionText: `${mins} 分钟 = ？秒`,
+        choices: generateChoices(correct, makeDistractors(correct)),
+        correctAnswer: correct,
+        explanation: `1 分钟 = 60 秒，${mins} 分钟 = ${correct} 秒`,
+      };
+    }
+  }
 }
 
 // ---- 主生成函数 ----
@@ -494,6 +630,7 @@ export function generateQuestion(level: Level, allowedTypes?: QuestionType[]): Q
     case 'word_problem': return genWordProblem(level);
     case 'shapes': return genShapes(level);
     case 'patterns': return genPatterns(level);
+    case 'time': return genTime(level);
     default: return genAddition(level);
   }
 }
@@ -508,8 +645,22 @@ export function generateWorksheetProblems(
 
   for (let i = 0; i < count; i++) {
     const type = availableTypes[randInt(0, availableTypes.length - 1)];
-    const q = generateQuestion(level, [type]);
-    problems.push({ index: i + 1, type: q.type, questionText: q.questionText, answer: q.correctAnswer });
+
+    if (type === 'shapes') {
+      // PDF 练习题中用绘图指令替代选择题
+      const shapes = ['圆形', '正方形', '三角形'];
+      if (level >= 2) shapes.push('长方形', '椭圆形');
+      const shape = shapes[randInt(0, shapes.length - 1)];
+      problems.push({
+        index: i + 1,
+        type: 'shapes',
+        questionText: `请在空白处画一个 ${shape}：`,
+        answer: 0,
+      });
+    } else {
+      const q = generateQuestion(level, [type]);
+      problems.push({ index: i + 1, type: q.type, questionText: q.questionText, answer: q.correctAnswer });
+    }
   }
   return problems;
 }
